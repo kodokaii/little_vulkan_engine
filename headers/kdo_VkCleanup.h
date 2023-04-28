@@ -22,7 +22,7 @@
 # include "kdo_Vulkan.h"
 
 void    kdo_freePhysicalDevice(Kdo_Vulkan *vk);
-void    kdo_swapchainCleanup(Kdo_Vulkan *vk);
+void    kdo_swapChainCleanup(Kdo_Vulkan *vk);
 void    kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode);
 
 #endif

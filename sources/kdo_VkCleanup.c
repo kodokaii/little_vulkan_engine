@@ -20,15 +20,23 @@ void	kdo_freePhysicalDevice(Kdo_Vulkan *vk)
 	KDO_FREE(vk->physicalDevice.queueProperties.presentSupport)
 }
 
-void	kdo_swapchainCleanup(Kdo_Vulkan *vk)
+void	kdo_swapChainCleanup(Kdo_Vulkan *vk)
 {
-
+	for (uint32_t i = 0; i < vk->swapChain.imagesCount; i++)
+		KDO_DESTROY(vkDestroyImageView, vk->device.path, vk->swapChain.views[i])
+	KDO_DESTROY(vkDestroySwapchainKHR, vk->device.path, vk->swapChain.old)
 }
 
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 {
 	printf("%s\nReturn Code: %d\n", msg, returnCode);
 
+	if (vk->device.path)
+		vkDeviceWaitIdle(vk->device.path);
+
+	kdo_swapChainCleanup(vk);
+	KDO_DESTROY(vkDestroySwapchainKHR, vk->device.path, vk->swapChain.path)
+	KDO_DESTROY(vkDestroySurfaceKHR, vk->instance.path, vk->surface.path)
 	if (vk->device.path)
 	{
 		vkDestroyDevice(vk->device.path, NULL);

@@ -13,5 +13,9 @@
 # define KDO_VKSWAPCHAIN_H
 
 # include "kdo_Vulkan.h"
+# include "kdo_VkPhysicalDevice.h"
+
+void	kdo_initSwapChain(Kdo_Vulkan *vk);
+void	kdo_recreateSwapChain(Kdo_Vulkan *vk);
 
 #endif

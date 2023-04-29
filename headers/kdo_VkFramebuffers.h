@@ -9,11 +9,11 @@
 /*                        <kodokai.featheur@gmail.com>                                 */
 /* *********************************************************************************** */
 
-#ifndef KDO_VKGRAPHICSPIPELINE_H
-# define KDO_VKGRAPHICSPIPELINE_H
+#ifndef KDO_VKFRAMEBUFFERS_H
+# define KDO_VKFRAMEBUFFERS_H
 
 # include "kdo_Vulkan.h"
 
-void    kdo_initGraphicsPipeline(Kdo_Vulkan *vk);
+void	kdo_initFramebuffers(Kdo_Vulkan *vk);
 
 #endif

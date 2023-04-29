@@ -14,4 +14,6 @@
 
 # include "kdo_Vulkan.h"
 
+void	kdo_initRenderPass(Kdo_Vulkan *vk);
+
 #endif

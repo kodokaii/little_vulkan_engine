@@ -22,9 +22,20 @@ void	kdo_freePhysicalDevice(Kdo_Vulkan *vk)
 
 void	kdo_swapChainCleanup(Kdo_Vulkan *vk)
 {
+	KDO_DESTROY(vkDestroyRenderPass, vk->device.path, vk->renderPass.path)
+	KDO_DESTROY(vkDestroyImageView, vk->device.path, vk->framebuffer.depth.view)
+	KDO_DESTROY(vkDestroyImage, vk->device.path, vk->framebuffer.depth.image)
+	KDO_DESTROY(vkFreeMemory, vk->device.path, vk->framebuffer.depth.memory)
 	for (uint32_t i = 0; i < vk->swapChain.imagesCount; i++)
+	{
 		KDO_DESTROY(vkDestroyImageView, vk->device.path, vk->swapChain.views[i])
+		KDO_DESTROY(vkDestroyFramebuffer, vk->device.path, vk->framebuffer.path[i])
+	}
 	KDO_DESTROY(vkDestroySwapchainKHR, vk->device.path, vk->swapChain.old)
+
+	KDO_FREE(vk->swapChain.images);
+	KDO_FREE(vk->swapChain.views);
+	KDO_FREE(vk->framebuffer.path);
 }
 
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
@@ -34,6 +45,12 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 	if (vk->device.path)
 		vkDeviceWaitIdle(vk->device.path);
 
+	
+	KDO_DESTROY(vkDestroyShaderModule, vk->device.path, vk->graphicsPipeline.vertexShader.module)
+	KDO_DESTROY(vkDestroyShaderModule, vk->device.path, vk->graphicsPipeline.fragmentShader.module)
+	KDO_DESTROY(vkDestroyDescriptorSetLayout, vk->device.path, vk->graphicsPipeline.descriptorLayout)
+	KDO_DESTROY(vkDestroyPipelineLayout, vk->device.path, vk->graphicsPipeline.layout)
+	KDO_DESTROY(vkDestroyPipeline, vk->device.path, vk->graphicsPipeline.path)
 	kdo_swapChainCleanup(vk);
 	KDO_DESTROY(vkDestroySwapchainKHR, vk->device.path, vk->swapChain.path)
 	KDO_DESTROY(vkDestroySurfaceKHR, vk->instance.path, vk->surface.path)

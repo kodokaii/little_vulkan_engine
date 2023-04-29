@@ -25,13 +25,15 @@
 # include <stdio.h>
 # include <string.h>
 
+# define SZ_SHADER		2
+
 # define QUEUES_COUNT	3
-#define PRESENT_QUEUE   0
-#define GRAPHIC_QUEUE   1
-#define TRANSFER_QUEUE  2
+# define PRESENT_QUEUE   0
+# define GRAPHIC_QUEUE   1
+# define TRANSFER_QUEUE  2
 
 # define ERRLOC			"CPU Memory allocation error"
-# define FOR_NO_ERROR	0
+# define FOR_NO_ERROR	-1
 
 typedef enum Kdo_ObjectStatus
 {
@@ -53,18 +55,21 @@ typedef struct Kdo_VkBufferCreateInfo
 {
 	VkBufferCreateInfo		path;
 	VkMemoryPropertyFlags	memoryFlags;
-	VkBuffer				*buffer;
-	VkDeviceMemory			*memory;
-}	Kdo_BufferCreateInfo;
+}	Kdo_VkBufferCreateInfo;
 
-typedef struct Kdo_ImageCreateInfo
+typedef struct Kdo_VkImageCreateInfo
 {
 	VkImageCreateInfo		path;
 	VkMemoryPropertyFlags	memoryFlags;
-	VkImage					*image;
-	VkDeviceMemory			*memory;
-} Kdo_ImageCreateInfo;
+} Kdo_VkImageCreateInfo;
 
+typedef struct Kdo_VkDepthBuffer
+{
+	VkImage			image;
+	VkDeviceMemory	memory;
+	VkImageView		view;
+	VkFormat		format;
+}	Kdo_VkDepthBuffer;
 
 typedef struct Kdo_VkQueue
 {
@@ -78,13 +83,13 @@ typedef struct Kdo_Vertex
     vec3	pos;
     vec3	color;
 	vec3	tex;
-	vec3	normal;
 }	Kdo_Vertex;
 
 typedef struct Kdo_Shader
 {
-	char	*code;
-	long	codeSize;
+	char			*code;
+	long			codeSize;
+	VkShaderModule  module;
 }	Kdo_Shader;
 
 typedef struct Kdo_SynImage
@@ -179,14 +184,16 @@ typedef struct Kdo_VkRenderPass
 typedef struct Kdo_VkGraphicsPipeline
 {
 	VkPipeline				path;
-	Kdo_Shader				VertexShader;
-	Kdo_Shader				FragmentShader;
+	Kdo_Shader				vertexShader;
+	Kdo_Shader				fragmentShader;
+	VkDescriptorSetLayout   descriptorLayout;
 	VkPipelineLayout		layout;
 }	Kdo_VkGraphicsPipeline;
 
 typedef struct Kdo_VkFramebuffer
 {
-	VkFramebuffer	*path;
+	VkFramebuffer		*path;
+	Kdo_VkDepthBuffer	depth;
 }	Kdo_VkFramebuffer;
 
 typedef struct Kdo_VkSemaphore

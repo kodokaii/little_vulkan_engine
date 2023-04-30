@@ -9,18 +9,11 @@
 /*                        <kodokai.featheur@gmail.com>                                 */
 /* *********************************************************************************** */
 
-#include "kdo_VkInit.h"
+#ifndef KDO_VKRENDER_H
+# define KDO_VKRENDER_H
 
-void	kdo_initVulkan(Kdo_Vulkan *vk)
-{
-	kdo_initInstance(vk);
-	kdo_initSurface(vk);
-	kdo_initPhysicalDevice(vk);
-	kdo_initDevice(vk);
-	kdo_initSwapChain(vk);
-	kdo_initRenderPass(vk);
-	kdo_initGraphicsPipeline(vk);
-	kdo_initFramebuffers(vk);
-	kdo_initSyncronisation(vk);
-	kdo_initRender(vk);
-}
+# include "kdo_Vulkan.h"
+
+void    kdo_initRender(Kdo_Vulkan *vk);
+
+#endif

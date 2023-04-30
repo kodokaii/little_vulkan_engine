@@ -13,28 +13,40 @@
 
 static void	kdo_initDepthBuffer(Kdo_Vulkan *vk)
 {
-	Kdo_VkImageCreateInfo	imageInfo;
+	VkImageCreateInfo		imageInfo;
 	VkImageViewCreateInfo   viewInfo;
+	VkMemoryRequirements	memRequirements;
+	VkMemoryAllocateInfo	allocInfo;
 
-	imageInfo.path.sType					= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.path.pNext					= NULL;
-	imageInfo.path.flags					= 0;
-	imageInfo.path.imageType				= VK_IMAGE_TYPE_2D;
-	imageInfo.path.format					= vk->framebuffer.depth.format;
-	imageInfo.path.extent.width				= vk->swapChain.imagesExtent.width;
-	imageInfo.path.extent.height			= vk->swapChain.imagesExtent.height;
-	imageInfo.path.extent.depth				= 1;
-	imageInfo.path.mipLevels				= 1;
-	imageInfo.path.arrayLayers				= 1;
-	imageInfo.path.samples					= VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.path.tiling					= VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.path.usage					= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	imageInfo.path.sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.path.queueFamilyIndexCount	= 0;
-	imageInfo.path.pQueueFamilyIndices		= NULL;
-	imageInfo.path.initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.memoryFlags					= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	kdo_createImage(vk, imageInfo, &vk->framebuffer.depth.memory, &vk->framebuffer.depth.image);
+	imageInfo.sType					= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.pNext					= NULL;
+	imageInfo.flags					= 0;
+	imageInfo.imageType				= VK_IMAGE_TYPE_2D;
+	imageInfo.format				= vk->framebuffer.depth.format;
+	imageInfo.extent.width			= vk->swapChain.imagesExtent.width;
+	imageInfo.extent.height			= vk->swapChain.imagesExtent.height;
+	imageInfo.extent.depth			= 1;
+	imageInfo.mipLevels				= 1;
+	imageInfo.arrayLayers			= 1;
+	imageInfo.samples				= VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.tiling				= VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage					= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	imageInfo.sharingMode			= VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.queueFamilyIndexCount	= 0;
+	imageInfo.pQueueFamilyIndices	= NULL;
+	imageInfo.initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
+	if (vkCreateImage(vk->device.path, &imageInfo, NULL, &vk->framebuffer.depth.image) != VK_SUCCESS)
+		kdo_cleanup(vk, "Depth image creation failed", 16);
+
+	vkGetImageMemoryRequirements(vk->device.path, vk->framebuffer.depth.image, &memRequirements);
+	allocInfo.sType				= VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.pNext				= NULL;
+	allocInfo.allocationSize	= memRequirements.size;
+	allocInfo.memoryTypeIndex	= kdo_findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vk);
+	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &vk->framebuffer.depth.memory) != VK_SUCCESS)
+		kdo_cleanup(vk, "Depth memory allocation failed", 17);
+
+	vkBindImageMemory(vk->device.path, vk->framebuffer.depth.image, vk->framebuffer.depth.memory, 0);
 
 	viewInfo.sType                              = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	viewInfo.pNext                              = NULL;
@@ -52,7 +64,7 @@ static void	kdo_initDepthBuffer(Kdo_Vulkan *vk)
 	viewInfo.subresourceRange.baseArrayLayer    = 0;
 	viewInfo.subresourceRange.layerCount        = 1;
 	if (vkCreateImageView(vk->device.path, &viewInfo, NULL, &vk->framebuffer.depth.view) != VK_SUCCESS)
-		kdo_cleanup(vk, "View depth image creation failed", 18);
+		kdo_cleanup(vk, "Depth view creation failed", 18);
 }
 
 void    kdo_initFramebuffers(Kdo_Vulkan *vk)

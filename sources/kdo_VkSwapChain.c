@@ -142,5 +142,7 @@ void	kdo_recreateSwapchain(Kdo_Vulkan *vk)
 	vkDeviceWaitIdle(vk->device.path);
 	
 	kdo_swapChainCleanup(vk);
-	//RENDER PASS
+	kdo_initRenderPass(vk);
+	kdo_initFramebuffers(vk);
+	kdo_initSyncronisation(vk);
 }

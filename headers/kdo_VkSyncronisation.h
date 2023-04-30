@@ -14,4 +14,6 @@
 
 # include "kdo_Vulkan.h"
 
+void    kdo_initSyncronisation(Kdo_Vulkan *vk);
+
 #endif

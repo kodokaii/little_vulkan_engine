@@ -35,34 +35,6 @@
 # define ERRLOC			"CPU Memory allocation error"
 # define FOR_NO_ERROR	-1
 
-typedef enum Kdo_ObjectStatus
-{
-	Invisible	= 0x00000001
-}	Kdo_ObjectStatus;
-
-typedef struct Kdo_VkQueueInfo
-{
-	uint32_t		count;
-	float			priority;
-	VkQueueFlags	requiredFlags;
-	VkQueueFlags	noRequiredFlags;
-	VkQueueFlags	preferredFlags;
-	VkQueueFlags	noPreferredFlags;
-	VkBool32		presentSupport;
-}	Kdo_VkQueueInfo;
-
-typedef struct Kdo_VkBufferCreateInfo
-{
-	VkBufferCreateInfo		path;
-	VkMemoryPropertyFlags	memoryFlags;
-}	Kdo_VkBufferCreateInfo;
-
-typedef struct Kdo_VkImageCreateInfo
-{
-	VkImageCreateInfo		path;
-	VkMemoryPropertyFlags	memoryFlags;
-} Kdo_VkImageCreateInfo;
-
 typedef struct Kdo_VkDepthBuffer
 {
 	VkImage			image;
@@ -82,7 +54,7 @@ typedef struct Kdo_Vertex
 {
     vec3	pos;
     vec3	color;
-	vec3	tex;
+	vec2	tex;
 }	Kdo_Vertex;
 
 typedef struct Kdo_Shader
@@ -97,6 +69,33 @@ typedef struct Kdo_SynImage
 	struct Kdo_SynImage	**path;
 	VkFence				*renderFinishedFence;
 }	Kdo_SynImage;
+
+
+typedef struct Kdo_VkQueueInfo
+{
+	uint32_t		count;
+	float			priority;
+	VkQueueFlags	requiredFlags;
+	VkQueueFlags	noRequiredFlags;
+	VkQueueFlags	preferredFlags;
+	VkQueueFlags	noPreferredFlags;
+	VkBool32		presentSupport;
+}	Kdo_VkQueueInfo;
+
+typedef enum Kdo_VkObjectStatus
+{
+	Invisible	= 0x00000001
+}	Kdo_VkObjectStatus;
+
+typedef struct Kdo_VkAddObjectInfo
+{
+	char				*name;
+	uint32_t			count;
+	Kdo_VkObjectStatus	status;
+	VkDeviceSize		vertexCount;
+	Kdo_Vertex			*vertex;
+	char				*texturePath;
+}	Kdo_VkAddObjectInfo;
 
 typedef	struct Kdo_VkInitInfo
 {
@@ -210,44 +209,30 @@ typedef struct Kdo_VkFence
 typedef struct Kdo_VkObject
 {
 	char				*name;
-	void				*data;
 	uint32_t			count;
 	mat4				*model;
-	Kdo_ObjectStatus	status;
+	Kdo_VkObjectStatus	status;
 	VkDeviceSize		vertexCount;
 	VkDeviceSize		indexCount;
 	VkDeviceSize		textureSize;
-	VkDeviceSize		vertexOffset;
-	VkDeviceSize		indexOffset;
-	VkDeviceSize		textureOffset;
-	VkDeviceSize		descriptorOffset;
+	VkBuffer			vertex;
+	VkBuffer			index;
+	VkImage				texture;
+	VkImageView			textureView;
 	struct Kdo_VkObject	*next;
 }	Kdo_VkObject;
 
 typedef struct Kdo_VkRender
 {
-	VkDeviceSize		vertexCount;
-	VkDeviceSize		indexCount;
-	VkDeviceSize		textureSize;
-	VkBuffer			stageVertexBuffer;
-	VkBuffer			stageTextureBuffer;
-	VkBuffer			stageDescriptorBuffer;
-	VkBuffer			vertexBuffer;
-	VkBuffer			textureBuffer;
-	VkBuffer			descriptorBuffer;
-	VkDeviceMemory		stageVertexMemory;
-	VkDeviceMemory		stageTextureMemory;
-	VkDeviceMemory		stageDescriptorMemory;
-	VkDeviceMemory		vertexMemory;
-	VkDeviceMemory		textureMemory;
-	VkDeviceMemory		descriptorMemory;
-	VkCommandPool		transfertPool;
-	VkCommandPool		renderPool;
+	VkCommandPool		transferPool;
 	VkDescriptorPool	descriptorPool;
 	VkDescriptorSet		descriptorSet;
-	VkCommandBuffer		renderbuffer;
-	Kdo_VkObject		*objects;
+	VkSampler			basicSampler;
+	VkDeviceMemory		vertexMemory;
+	VkDeviceMemory		indexMemory;
+	VkDeviceMemory		textureMemory;
 	uint32_t			objectsCount;
+	Kdo_VkObject		*objects;
 }	Kdo_VkRender;
 
 typedef struct Kdo_VkDisplay
@@ -256,8 +241,8 @@ typedef struct Kdo_VkDisplay
 	uint32_t		currentFrame;
 	uint32_t		maxParallelFrame;
 	uint32_t		windowResized;
-	Kdo_SynImage	*imageLinks;
-	Kdo_SynImage	**fenceLinks;
+	Kdo_SynImage	*frameToImage;
+	Kdo_SynImage	**imageToFrame;
 }	Kdo_VkDisplay;
 
 typedef struct Kdo_VkCamera

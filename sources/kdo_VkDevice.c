@@ -116,6 +116,8 @@ void    kdo_initDevice(Kdo_Vulkan *vk)
 	VkPhysicalDeviceFeatures	deviceFeatures	= {};
 	float						queuePriority[QUEUES_COUNT];
 
+	deviceFeatures.samplerAnisotropy	= VK_TRUE;
+
 	deviceInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceInfo.pNext					= NULL;
 	deviceInfo.flags					= 0;

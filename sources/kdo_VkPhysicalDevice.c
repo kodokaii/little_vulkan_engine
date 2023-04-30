@@ -71,7 +71,7 @@ static int	kdo_checkPhysicalDevice(Kdo_Vulkan *vk)
 	vkGetPhysicalDeviceProperties(vk->physicalDevice.path, &vk->physicalDevice.properties);
 	vkGetPhysicalDeviceFeatures(vk->physicalDevice.path, &vk->physicalDevice.features);
 	vkGetPhysicalDeviceMemoryProperties(vk->physicalDevice.path, &vk->physicalDevice.memProperties);
-	if(!vk->physicalDevice.features.geometryShader || vk->physicalDevice.properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+	if(!vk->physicalDevice.features.geometryShader || !vk->physicalDevice.features.samplerAnisotropy || vk->physicalDevice.properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 		return (1);
 
 	return (0);

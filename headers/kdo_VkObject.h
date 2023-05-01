@@ -13,5 +13,6 @@
 # define KDO_VKOBJECT_H
 
 # include "kdo_Vulkan.h"
+# include "stb/stb_image.h"
 
 #endif

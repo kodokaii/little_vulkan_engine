@@ -43,7 +43,7 @@ VkFormat	kdo_findFormat(Kdo_Vulkan *vk, VkFormat *formats, uint32_t formatsCount
 	return (FOR_NO_ERROR);
 }
 
-uint32_t	kdo_findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags memoryFlags, Kdo_Vulkan *vk)
+uint32_t	kdo_findMemoryType(Kdo_Vulkan *vk, uint32_t typeFilter, VkMemoryPropertyFlags memoryFlags)
 {
 	for (uint32_t i = 0; i < vk->physicalDevice.memProperties.memoryTypeCount; i++)
 	{
@@ -89,8 +89,8 @@ void	kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 	submitInfo.pCommandBuffers		= commandBuffer;
 	submitInfo.signalSemaphoreCount	= 0;
 	submitInfo.pSignalSemaphores	= NULL;
-	vkQueueSubmit(vk->device.queues[GRAPHIC_QUEUE].path, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(vk->device.queues[GRAPHIC_QUEUE].path);
+	vkQueueSubmit(vk->device.queues[TRANSFER_QUEUE].path, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk->device.queues[TRANSFER_QUEUE].path);
 
 	vkFreeCommandBuffers(vk->device.path, vk->render.transferPool, 1, commandBuffer);
 }
@@ -116,53 +116,49 @@ void	kdo_queueTransferBuffer(Kdo_Vulkan *vk, uint32_t srcQueueFamilyIndex, uint3
 	kdo_endUniqueCommand(vk, &commandBuffer);
 }
 
-VkDeviceSize	kdo_countUniqueVertex(VkDeviceSize vertexCount, Kdo_Vertex *vertex)
+VkBuffer	kdo_createBuffer(Kdo_Vulkan *vk, VkDeviceSize size, VkBufferUsageFlags usage)
 {
-	VkDeviceSize i;
-	VkDeviceSize j;
+	VkBufferCreateInfo	bufferInfo;
+	VkBuffer			buffer;
 
-	for (i = 0; i < vertexCount; i++)
-	{
-		for (j = i + 1; j < vertexCount
-				 &&(!glm_vec3_eqv(vertex[i].pos, vertex[j].pos)
-				 || !glm_vec3_eqv(vertex[i].color, vertex[j].color)
-				 || !glm_vec2_eqv(vertex[i].tex, vertex[j].tex)); j++);
-		if (j != vertexCount)
-			vertexCount--;
-	}
-	return (vertexCount);
+	bufferInfo.sType					= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.pNext					= NULL;
+	bufferInfo.flags					= 0;
+	bufferInfo.size						= size;
+	bufferInfo.usage					= usage;
+	bufferInfo.sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
+	bufferInfo.queueFamilyIndexCount	= 0;
+	bufferInfo.pQueueFamilyIndices		= NULL;
+	if (vkCreateBuffer(vk->device.path, &bufferInfo, NULL, &buffer) != VK_SUCCESS)
+		kdo_cleanup(vk, "Buffer creation failed", 24);
+
+	return (buffer);
 }
 
-void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *info)
+VkImage	kdo_createImageTexture(Kdo_Vulkan *vk, int width, int height)
 {
-	Kdo_VkObject	**lastObject;
-	Kdo_VkObject	**currentObject;
-	VkDeviceSize	sizeVertexAndIndex	= 0;
-	VkDeviceSize	sizeTexture			= 0;
-	VkDeviceMemory	stagingMemoryVertexAndIndex;
-	VkDeviceMemory	stagingMemoryTexture;
+	VkImageCreateInfo	imageInfo;
+	VkImage				image;
 
+	imageInfo.sType					= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.pNext					= NULL;
+	imageInfo.flags					= 0;
+	imageInfo.imageType				= VK_IMAGE_TYPE_2D;
+	imageInfo.format				= VK_FORMAT_R8G8B8A8_SRGB;
+	imageInfo.extent.width			= width;
+	imageInfo.extent.height			= height;
+	imageInfo.extent.depth			= 1;
+	imageInfo.mipLevels				= 1;
+	imageInfo.arrayLayers			= 1;
+	imageInfo.samples				= VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.tiling				= VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage					= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.sharingMode			= VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.queueFamilyIndexCount	= 0;
+	imageInfo.pQueueFamilyIndices	= NULL;
+	imageInfo.initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
+	if (vkCreateImage(vk->device.path, &imageInfo, NULL, &image) != VK_SUCCESS)
+		kdo_cleanup(vk, "Image texture creation failed", 25);
 
-	lastObject = &vk->render.objects;
-	while (*lastObject)
-		lastObject = &(*lastObject)->next;
-
-	currentObject = lastObject;
-	for (uint32_t i = 0; i < objectsCount; i++)
-	{
-		if (!(*currentObject = malloc(sizeof(Kdo_VkObject))))
-			kdo_cleanup(vk, ERRLOC, 12);
-
-		(*currentObject)->name			= info[i].name;
-		(*currentObject)->count			= info[i].count;
-		(*currentObject)->status		= info[i].status;
-		(*currentObject)->vertexCount	= kdo_countUniqueVertex(info[i].vertexCount, info[i].vertex);
-		(*currentObject)->indexCount	= info[i].vertexCount;
-
-		//textureSize
-
-		sizeVertexAndIndex += (*currentObject)->vertexCount + (*currentObject)->indexCount;
-
-		currentObject = &(*currentObject)->next;
-	}
+	return (image);
 }

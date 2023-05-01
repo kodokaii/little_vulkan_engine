@@ -16,7 +16,6 @@
 # define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 # define STB_IMAGE_IMPLEMENTATION
 # include "cglm/cglm.h"
-//# include "stb/stb_image.h"
 
 # define GLFW_INCLUDE_VULKAN
 # include <GLFW/glfw3.h>
@@ -212,13 +211,10 @@ typedef struct Kdo_VkObject
 	uint32_t			count;
 	mat4				*model;
 	Kdo_VkObjectStatus	status;
-	VkDeviceSize		vertexCount;
-	VkDeviceSize		indexCount;
+	VkDeviceSize		vertexSize;
+	VkDeviceSize		indexSize;
 	VkDeviceSize		textureSize;
-	VkBuffer			vertex;
-	VkBuffer			index;
 	VkImage				texture;
-	VkImageView			textureView;
 	struct Kdo_VkObject	*next;
 }	Kdo_VkObject;
 
@@ -228,8 +224,11 @@ typedef struct Kdo_VkRender
 	VkDescriptorPool	descriptorPool;
 	VkDescriptorSet		descriptorSet;
 	VkSampler			basicSampler;
-	VkDeviceMemory		vertexMemory;
-	VkDeviceMemory		indexMemory;
+	uint32_t			textureMemoryType;
+	VkDeviceSize		vertexAndIndexSize;
+	VkDeviceSize		textureSize;
+	VkBuffer			vertexAndIndexBuffer;
+	VkDeviceMemory		vertexAndIndexMemory;
 	VkDeviceMemory		textureMemory;
 	uint32_t			objectsCount;
 	Kdo_VkObject		*objects;

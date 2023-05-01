@@ -42,7 +42,7 @@ static void	kdo_initDepthBuffer(Kdo_Vulkan *vk)
 	allocInfo.sType				= VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.pNext				= NULL;
 	allocInfo.allocationSize	= memRequirements.size;
-	allocInfo.memoryTypeIndex	= kdo_findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vk);
+	allocInfo.memoryTypeIndex	= kdo_findMemoryType(vk, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &vk->framebuffer.depth.memory) != VK_SUCCESS)
 		kdo_cleanup(vk, "Depth memory allocation failed", 17);
 

@@ -11,6 +11,9 @@
 
 #include "kdo_VkObject.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 static uint32_t	kdo_countUniqueVertex(VkDeviceSize vertexCount, Kdo_Vertex *vertex)
 {
 	uint32_t i;
@@ -32,10 +35,8 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 {
 	Kdo_VkObject				**lastObject;
 	Kdo_VkObject				**currentObject;
-	VkBuffer					buffer;
-	int							texWidth;
-	int							texHeight;
 	int							texChannels;
+	uint32_t					i;
 	VkDeviceSize				vertexAndIndexSize;
 	VkDeviceSize				textureSize;
 	VkDeviceSize				textureOffset;
@@ -55,6 +56,7 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 	VkCommandBuffer				copyCommandBuffer;
 	VkBufferCopy				copyBufferInfo;
 	VkImageMemoryBarrier		*imageBarrierInfo;
+	VkBufferImageCopy			copyImageInfo;
 
 	lastObject = &vk->render.objects;
 	while (*lastObject)
@@ -63,7 +65,7 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 	vertexAndIndexSize	= 0;
 	textureSize			= 0;
 	currentObject		= lastObject;
-	for (uint32_t i = 0; i < objectsCount; i++)
+	for (i = 0; i < objectsCount; i++)
 	{
 		if (!(*currentObject = malloc(sizeof(Kdo_VkObject))))
 			kdo_cleanup(vk, ERRLOC, 12);
@@ -75,18 +77,18 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 			kdo_cleanup(vk, ERRLOC, 12);
 		glm_mat4_identity_array((*currentObject)->model, info[i].count);
 
-		buffer	= kdo_createBuffer(vk, kdo_countUniqueVertex(info[i].vertexCount, info[i].vertex) * sizeof(Kdo_Vertex), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		vkGetBufferMemoryRequirements(vk->device.path, buffer, &memRequirements);
+		stagingBuffer = kdo_createBuffer(vk, kdo_countUniqueVertex(info[i].vertexCount, info[i].vertex) * sizeof(Kdo_Vertex), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		vkGetBufferMemoryRequirements(vk->device.path, stagingBuffer, &memRequirements);
 		(*currentObject)->vertexSize	= memRequirements.size;
-		vkDestroyBuffer(vk->device.path, buffer, NULL);
+		vkDestroyBuffer(vk->device.path, stagingBuffer, NULL);
 
-		buffer	= kdo_createBuffer(vk, info[i].vertexCount * sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-		vkGetBufferMemoryRequirements(vk->device.path, buffer, &memRequirements);
+		stagingBuffer	= kdo_createBuffer(vk, info[i].vertexCount * sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+		vkGetBufferMemoryRequirements(vk->device.path, stagingBuffer, &memRequirements);
 		(*currentObject)->indexSize		= memRequirements.size;
-		vkDestroyBuffer(vk->device.path, buffer, NULL);
+		vkDestroyBuffer(vk->device.path, stagingBuffer, NULL);
 
-		stbi_info(info[i].texturePath, &texWidth, &texHeight, &texChannels);
-		(*currentObject)->texture	= kdo_createImageTexture(vk, texWidth, texHeight);
+		stbi_info(info[i].texturePath, &(*currentObject)->textureWidth, &(*currentObject)->textureHeight, &texChannels);
+		(*currentObject)->texture	= kdo_createImageTexture(vk, (*currentObject)->textureWidth, (*currentObject)->textureHeight);
 		vkGetImageMemoryRequirements(vk->device.path, (*currentObject)->texture, &memRequirements);
 		(*currentObject)->textureSize	= memRequirements.size;
 
@@ -111,7 +113,7 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 	vertexAndIndexOffset	= 0;
 	textureOffset			= vertexAndIndexSize;
 	currentObject			= lastObject;
-	for (uint32_t i = 0; i < objectsCount; i++)
+	for (i = 0; i < objectsCount; i++)
 	{
 		vertexOffset	= 0;
 		indexOffset		= 0;
@@ -128,9 +130,9 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 		}
 		vertexAndIndexOffset += (*currentObject)->vertexSize + (*currentObject)->indexSize;
 
-		if (!(currentTexture   = stbi_load(info[i].texturePath, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha)))
+		if (!(currentTexture   = stbi_load(info[i].texturePath, &(*currentObject)->textureWidth, &(*currentObject)->textureHeight, &texChannels, STBI_rgb_alpha)))
 			kdo_cleanup(vk, "Texture load failed", 26);
-		memcpy(data + textureOffset, currentTexture, texWidth * texHeight * 4);
+		memcpy(data + textureOffset, currentTexture, (*currentObject)->textureWidth * (*currentObject)->textureHeight * 4);
 		stbi_image_free(currentTexture);
 		textureOffset += (*currentObject)->textureSize;
 
@@ -138,7 +140,7 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 	}
 	vkUnmapMemory(vk->device.path, stagingMemory);
 
-	vertexAndIndexBuffer = kdo_createBuffer(vk, vertexAndIndexSize + vk->render.vertexAndIndexSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+	vertexAndIndexBuffer = kdo_createBuffer(vk, vertexAndIndexSize + vk->render.vertexAndIndexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	vkGetBufferMemoryRequirements(vk->device.path, vertexAndIndexBuffer, &memRequirements);
     allocInfo.allocationSize    = memRequirements.size;
     allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -151,58 +153,94 @@ void	kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *
 	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &textureMemory) != VK_SUCCESS)
 		kdo_cleanup(vk, "allocation texture memory failed", 28);
 
-	textureOffset	= 0;
-	currentObject	= lastObject;
-	for (uint32_t i = 0; i < objectsCount; i++)
-	{
-		vkBindImageMemory(vk->device.path, (*currentObject)->texture, textureMemory, textureOffset);
-		textureOffset += (*currentObject)->textureSize;
-		currentObject = &(*currentObject)->next;
-	}
 
 	kdo_beginUniqueCommand(vk, &copyCommandBuffer);
-	
-	copyBufferInfo.srcOffset	= 0;
-	copyBufferInfo.dstOffset	= 0;
-	copyBufferInfo.size			= vertexAndIndexSize;
-	vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, vertexAndIndexBuffer, 1, &copyBufferInfo);
 
 	if (vk->render.vertexAndIndexBuffer)
 	{
 		copyBufferInfo.srcOffset	= 0;
-		copyBufferInfo.dstOffset	= vertexAndIndexSize;
+		copyBufferInfo.dstOffset	= 0;
 		copyBufferInfo.size			= vk->render.vertexAndIndexSize;
 		vkCmdCopyBuffer(copyCommandBuffer, vk->render.vertexAndIndexBuffer, vertexAndIndexBuffer, 1, &copyBufferInfo);
 	}
+	
+	copyBufferInfo.srcOffset	= 0;
+	copyBufferInfo.dstOffset	= vk->render.vertexAndIndexSize;
+	copyBufferInfo.size			= vertexAndIndexSize;
+	vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, vertexAndIndexBuffer, 1, &copyBufferInfo);
 
 	if (!(imageBarrierInfo = malloc(objectsCount * sizeof(VkImageMemoryBarrier))))
 		kdo_cleanup(vk, ERRLOC, 12);
-			
-	// TODO
-	for (uint32_t i = 0; i < objectsCount; i++)
-	{
-		imageBarrierInfo[i].sType
-		imageBarrierInfo[i].pNext
-		imageBarrierInfo[i].srcAccessMask
-		imageBarrierInfo[i].dstAccessMask
-		imageBarrierInfo[i].oldLayout
-		imageBarrierInfo[i].newLayout
-		imageBarrierInfo[i].srcQueueFamilyIndex
-		imageBarrierInfo[i].dstQueueFamilyIndex
-		imageBarrierInfo[i].image
-		imageBarrierInfo[i].subresourceRange
-	}
 
+	textureOffset	= 0;
+	currentObject	= lastObject;
+	for (i = 0; i < objectsCount; i++)
+	{
+		vkBindImageMemory(vk->device.path, (*currentObject)->texture, textureMemory, textureOffset);
+
+		imageBarrierInfo[i].sType							= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageBarrierInfo[i].pNext							= NULL;
+		imageBarrierInfo[i].srcAccessMask					= 0;
+		imageBarrierInfo[i].dstAccessMask					= VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageBarrierInfo[i].oldLayout						= VK_IMAGE_LAYOUT_UNDEFINED;
+		imageBarrierInfo[i].newLayout						= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		imageBarrierInfo[i].srcQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+		imageBarrierInfo[i].dstQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+		imageBarrierInfo[i].image							= (*currentObject)->texture;
+		imageBarrierInfo[i].subresourceRange.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT;
+		imageBarrierInfo[i].subresourceRange.baseMipLevel	= 0;
+		imageBarrierInfo[i].subresourceRange.levelCount		= 1;
+		imageBarrierInfo[i].subresourceRange.baseArrayLayer	= 0;
+		imageBarrierInfo[i].subresourceRange.layerCount		= 1;
+	
+		textureOffset += (*currentObject)->textureSize;
+		currentObject = &(*currentObject)->next;
+	}
+	vkCmdPipelineBarrier(copyCommandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, objectsCount, imageBarrierInfo);
+
+	textureOffset	= vertexAndIndexSize;
+	currentObject	= lastObject;
+	for (i = 0; i < objectsCount; i++)
+	{
+		copyImageInfo.bufferOffset							= textureOffset;
+		copyImageInfo.bufferRowLength						= 0;
+		copyImageInfo.bufferImageHeight						= 0;
+		copyImageInfo.imageSubresource.aspectMask			= VK_IMAGE_ASPECT_COLOR_BIT;
+		copyImageInfo.imageSubresource.mipLevel				= 0;
+		copyImageInfo.imageSubresource.baseArrayLayer		= 0;
+		copyImageInfo.imageSubresource.layerCount			= 1;
+		copyImageInfo.imageOffset.x							= 0;
+		copyImageInfo.imageOffset.y							= 0;
+		copyImageInfo.imageOffset.z							= 0;
+		copyImageInfo.imageExtent.width						= (*currentObject)->textureWidth;
+		copyImageInfo.imageExtent.height					= (*currentObject)->textureHeight;
+		copyImageInfo.imageExtent.depth						= 1;
+		vkCmdCopyBufferToImage(copyCommandBuffer, stagingBuffer, (*currentObject)->texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyImageInfo);
+
+		imageBarrierInfo[i].srcAccessMask	= VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageBarrierInfo[i].dstAccessMask	= VK_ACCESS_SHADER_READ_BIT;
+		imageBarrierInfo[i].oldLayout		= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		imageBarrierInfo[i].newLayout		= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		textureOffset += (*currentObject)->textureSize;
+		currentObject = &(*currentObject)->next;
+	}
+	vkCmdPipelineBarrier(copyCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, objectsCount, imageBarrierInfo);
 
 	kdo_endUniqueCommand(vk, &copyCommandBuffer);
+	vkDestroyBuffer(vk->device.path, stagingBuffer, NULL);
 	vkFreeMemory(vk->device.path, stagingMemory, NULL);
+	free(imageBarrierInfo);
+
 
 	vkDeviceWaitIdle(vk->device.path);
-	vkFreeMemory(vk->device.path, vk->render.vertexAndIndexMemory, NULL);
-	vkFreeMemory(vk->device.path, vk->render.textureMemory, NULL);
+	KDO_DESTROY(vkDestroyBuffer, vk->device.path, vk->render.vertexAndIndexBuffer)
+	KDO_DESTROY(vkFreeMemory, vk->device.path, vk->render.vertexAndIndexMemory)
+	KDO_DESTROY(vkFreeMemory, vk->device.path, vk->render.textureMemory)
 	vk->render.vertexAndIndexBuffer	= vertexAndIndexBuffer;
 	vk->render.vertexAndIndexMemory	= vertexAndIndexMemory;
 	vk->render.textureMemory		= textureMemory;
 	vk->render.vertexAndIndexSize	+= vertexAndIndexSize;
 	vk->render.textureSize			+= textureSize;
+	vk->render.objectsCount			+= objectsCount;
 }

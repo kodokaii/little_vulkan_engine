@@ -95,27 +95,6 @@ void	kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 	vkFreeCommandBuffers(vk->device.path, vk->render.transferPool, 1, commandBuffer);
 }
 
-void	kdo_queueTransferBuffer(Kdo_Vulkan *vk, uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex, VkBuffer buffer)
-{
-	VkCommandBuffer			commandBuffer;
-	VkBufferMemoryBarrier	bufferBarrierInfo;
-	
-	kdo_beginUniqueCommand(vk, &commandBuffer);
-
-	bufferBarrierInfo.sType					= VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-	bufferBarrierInfo.pNext					= NULL;
-	bufferBarrierInfo.srcAccessMask			= VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-	bufferBarrierInfo.dstAccessMask			= VK_PIPELINE_STAGE_TRANSFER_BIT;
-	bufferBarrierInfo.srcQueueFamilyIndex	= srcQueueFamilyIndex;
-	bufferBarrierInfo.dstQueueFamilyIndex	= dstQueueFamilyIndex;
-	bufferBarrierInfo.buffer				= buffer;
-	bufferBarrierInfo.offset				= 0;
-	bufferBarrierInfo.size					= VK_WHOLE_SIZE;
-	vkCmdPipelineBarrier(commandBuffer, 0, VK_ACCESS_TRANSFER_WRITE_BIT, 0, 0, NULL, 1, &bufferBarrierInfo, 0, NULL);
-
-	kdo_endUniqueCommand(vk, &commandBuffer);
-}
-
 VkBuffer	kdo_createBuffer(Kdo_Vulkan *vk, VkDeviceSize size, VkBufferUsageFlags usage)
 {
 	VkBufferCreateInfo	bufferInfo;

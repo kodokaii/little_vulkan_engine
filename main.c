@@ -12,6 +12,7 @@
 #include "kdo_VkGlfw.h"
 #include "kdo_VkInit.h"
 #include "kdo_VkDisplay.h"
+#include "kdo_VkObject.h"
 
 int	main(int argc, char *argv[])
 {
@@ -51,10 +52,10 @@ int	main(int argc, char *argv[])
 
 	vk.info.queuesInfo[TRANSFER_QUEUE].count			= 1;
 	vk.info.queuesInfo[TRANSFER_QUEUE].priority			= 1.0f;
-	vk.info.queuesInfo[TRANSFER_QUEUE].requiredFlags	= VK_QUEUE_TRANSFER_BIT;
+	vk.info.queuesInfo[TRANSFER_QUEUE].requiredFlags	= VK_QUEUE_GRAPHICS_BIT;
 	vk.info.queuesInfo[TRANSFER_QUEUE].noRequiredFlags	= 0;
 	vk.info.queuesInfo[TRANSFER_QUEUE].preferredFlags	= 0;
-	vk.info.queuesInfo[TRANSFER_QUEUE].noPreferredFlags	= VK_QUEUE_GRAPHICS_BIT;
+	vk.info.queuesInfo[TRANSFER_QUEUE].noPreferredFlags	= 0;
 	vk.info.queuesInfo[TRANSFER_QUEUE].presentSupport	= 0;
 
 	vk.info.presentMode							= VK_PRESENT_MODE_MAILBOX_KHR; 
@@ -66,5 +67,33 @@ int	main(int argc, char *argv[])
 
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);
+
+	Kdo_VkAddObjectInfo	info[2];
+	Kdo_Vertex			vertex[] = {
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+};
+
+	info[0].name			= "test";
+	info[0].count			= 2;
+	info[0].status			= 0;
+	info[0].vertexCount	= 6;
+	info[0].vertex			= vertex;
+	info[0].texturePath	= "textures/sky.png";
+
+	info[1].name			= "test";
+	info[1].count			= 2;
+	info[1].status			= 0;
+	info[1].vertexCount	= 6;
+	info[1].vertex			= vertex;
+	info[1].texturePath	= "textures/sky.png";
+
+	kdo_addObjects(&vk, 1, info);
+	kdo_addObjects(&vk, 2, info);
+
 	kdo_cleanup(&vk, "Good !", 0);
 }

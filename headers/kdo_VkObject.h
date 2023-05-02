@@ -13,6 +13,7 @@
 # define KDO_VKOBJECT_H
 
 # include "kdo_Vulkan.h"
-# include "stb/stb_image.h"
+
+void    kdo_addObjects(Kdo_Vulkan *vk, uint32_t objectsCount, Kdo_VkAddObjectInfo *info);
 
 #endif

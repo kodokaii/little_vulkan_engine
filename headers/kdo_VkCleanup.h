@@ -23,6 +23,7 @@
 
 void    kdo_freePhysicalDevice(Kdo_Vulkan *vk);
 void    kdo_swapChainCleanup(Kdo_Vulkan *vk);
+void    kdo_objectsCleanup(Kdo_Vulkan *vk);
 void    kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode);
 
 #endif

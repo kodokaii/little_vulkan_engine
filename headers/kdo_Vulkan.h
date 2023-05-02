@@ -14,7 +14,6 @@
 
 # define CGLM_FORCE_LEFT_HANDED
 # define CGLM_FORCE_DEPTH_ZERO_TO_ONE
-# define STB_IMAGE_IMPLEMENTATION
 # include "cglm/cglm.h"
 
 # define GLFW_INCLUDE_VULKAN
@@ -213,6 +212,8 @@ typedef struct Kdo_VkObject
 	Kdo_VkObjectStatus	status;
 	VkDeviceSize		vertexSize;
 	VkDeviceSize		indexSize;
+	int					textureWidth;
+	int					textureHeight;
 	VkDeviceSize		textureSize;
 	VkImage				texture;
 	struct Kdo_VkObject	*next;

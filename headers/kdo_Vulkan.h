@@ -68,6 +68,38 @@ typedef struct Kdo_SynImage
 	VkFence				*renderFinishedFence;
 }	Kdo_SynImage;
 
+typedef enum Kdo_VkObjectStatus
+{
+	Invisible	= 0x00000001
+}	Kdo_VkObjectStatus;
+
+typedef	struct Kdo_VkBufferDiv
+{
+	uint32_t				count;
+	VkDeviceSize			size;
+	struct Kdo_VkBufferDiv	*next;
+}	Kdo_VkBufferDiv;
+
+typedef struct Kdo_VkImageDiv
+{
+	VkExtent3D				extent;
+	VkDeviceSize			size;
+	VkImage					image;
+	struct Kdo_VkImageDiv	*next;
+}	Kdo_VkImageDiv;
+
+typedef	struct Kdo_VkAddDataInfo
+{
+	uint32_t		count;
+	VkDeviceSize	size;
+	void			*data;
+}	Kdo_VkAddDataInfo;
+
+typedef struct Kdo_VkLoadMeshInfo
+{
+	uint32_t	count;
+	Kdo_Vertex	*vertex;
+}	Kdo_VkLoadMeshInfo;
 
 typedef struct Kdo_VkQueueInfo
 {
@@ -79,21 +111,6 @@ typedef struct Kdo_VkQueueInfo
 	VkQueueFlags	noPreferredFlags;
 	VkBool32		presentSupport;
 }	Kdo_VkQueueInfo;
-
-typedef enum Kdo_VkObjectStatus
-{
-	Invisible	= 0x00000001
-}	Kdo_VkObjectStatus;
-
-typedef struct Kdo_VkAddObjectInfo
-{
-	char				*name;
-	uint32_t			count;
-	Kdo_VkObjectStatus	status;
-	VkDeviceSize		vertexCount;
-	Kdo_Vertex			*vertex;
-	char				*texturePath;
-}	Kdo_VkAddObjectInfo;
 
 typedef	struct Kdo_VkInitInfo
 {
@@ -204,18 +221,34 @@ typedef struct Kdo_VkFence
 	VkFence	*renderFinished;
 }	Kdo_VkFence;
 
+typedef struct Kdo_VkBuffer
+{
+	VkBuffer			buffer;
+	VkBufferUsageFlags	usage;
+	VkDeviceSize		size;
+	VkDeviceMemory		memory;
+	uint32_t			divCount;
+	Kdo_VkBufferDiv		*div;
+}	Kdo_VkBuffer;
+
+typedef	struct Kdo_VkImage
+{
+	VkFormat        format;
+	VkDeviceSize	size;
+	VkDeviceMemory	memory;
+	uint32_t		divCount;
+	Kdo_VkImageDiv	div;
+}	Kdo_VkImage;
+
 typedef struct Kdo_VkObject
 {
 	char				*name;
 	uint32_t			count;
 	mat4				*model;
 	Kdo_VkObjectStatus	status;
-	VkDeviceSize		vertexSize;
-	VkDeviceSize		indexSize;
-	int					textureWidth;
-	int					textureHeight;
-	VkDeviceSize		textureSize;
-	VkImage				texture;
+	uint32_t			vertex;
+	uint32_t			index;
+	uint32_t			texture;
 	struct Kdo_VkObject	*next;
 }	Kdo_VkObject;
 
@@ -225,12 +258,9 @@ typedef struct Kdo_VkRender
 	VkDescriptorPool	descriptorPool;
 	VkDescriptorSet		descriptorSet;
 	VkSampler			basicSampler;
-	uint32_t			textureMemoryType;
-	VkDeviceSize		vertexAndIndexSize;
-	VkDeviceSize		textureSize;
-	VkBuffer			vertexAndIndexBuffer;
-	VkDeviceMemory		vertexAndIndexMemory;
-	VkDeviceMemory		textureMemory;
+	Kdo_VkBuffer		vertex;
+	Kdo_VkBuffer		index;
+	Kdo_VkImage			textures;
 	uint32_t			objectsCount;
 	Kdo_VkObject		*objects;
 }	Kdo_VkRender;
@@ -247,12 +277,13 @@ typedef struct Kdo_VkDisplay
 
 typedef struct Kdo_VkCamera
 {
+	mat4	path;
+	vec3	pos;
 	double	moveTime;
 	double  xMouse;
 	double	yMouse;
 	float	yaw;
 	float	pitch;
-	vec3	pos;
 } Kdo_VkCamera;
 
 

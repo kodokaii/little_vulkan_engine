@@ -49,20 +49,24 @@ void	kdo_swapChainCleanup(Kdo_Vulkan *vk)
 	KDO_FREE(vk->framebuffer.path);
 }
 
-void	kdo_objectsCleanup(Kdo_Vulkan *vk)
+void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 {
-	Kdo_VkObject				**currentObject;
-	Kdo_VkObject				**nextObject;
+    Kdo_VkBufferDiv **current;
+    Kdo_VkBufferDiv **next;
 
-	currentObject = &vk->render.objects;
-	for (uint32_t i = 0; i < vk->render.objectsCount; i++)
-	{
-		nextObject = &(*currentObject)->next;
-		KDO_FREE((*currentObject)->model)
-		KDO_DESTROY(vkDestroyImage, vk->device.path, (*currentObject)->texture)
-		KDO_FREE(*currentObject)
-		currentObject = nextObject;
-	}
+    current = &(buffer->div);
+    while (*current)
+    {
+        next = &(*current)->next;
+        free(*current);
+        current = next;
+    }
+    KDO_DESTROY(vkDestroyBuffer, vk->device.path, buffer->buffer)
+    KDO_DESTROY(vkFreeMemory, vk->device.path, buffer->memory)
+	buffer->usage		= 0;
+	buffer->size		= 0;
+	buffer->divCount	= 0;
+	buffer->div			= NULL;
 }
 
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
@@ -72,10 +76,9 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 	if (vk->device.path)
 		vkDeviceWaitIdle(vk->device.path);
 
-	kdo_objectsCleanup(vk);
-	KDO_DESTROY(vkDestroyBuffer, vk->device.path, vk->render.vertexAndIndexBuffer)	
-	KDO_DESTROY(vkFreeMemory, vk->device.path, vk->render.vertexAndIndexMemory)
-	KDO_DESTROY(vkFreeMemory, vk->device.path, vk->render.textureMemory)
+	kdo_freeBuffer(vk, &vk->render.vertex);
+	kdo_freeBuffer(vk, &vk->render.index);
+
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->render.descriptorPool)
 	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->render.basicSampler)
 	KDO_DESTROY(vkDestroyCommandPool, vk->device.path, vk->render.transferPool)

@@ -95,25 +95,6 @@ void	kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 	vkFreeCommandBuffers(vk->device.path, vk->render.transferPool, 1, commandBuffer);
 }
 
-VkBuffer	kdo_createBuffer(Kdo_Vulkan *vk, VkDeviceSize size, VkBufferUsageFlags usage)
-{
-	VkBufferCreateInfo	bufferInfo;
-	VkBuffer			buffer;
-
-	bufferInfo.sType					= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.pNext					= NULL;
-	bufferInfo.flags					= 0;
-	bufferInfo.size						= size;
-	bufferInfo.usage					= usage;
-	bufferInfo.sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
-	bufferInfo.queueFamilyIndexCount	= 0;
-	bufferInfo.pQueueFamilyIndices		= NULL;
-	if (vkCreateBuffer(vk->device.path, &bufferInfo, NULL, &buffer) != VK_SUCCESS)
-		kdo_cleanup(vk, "Buffer creation failed", 24);
-
-	return (buffer);
-}
-
 VkImage	kdo_createImageTexture(Kdo_Vulkan *vk, int width, int height)
 {
 	VkImageCreateInfo	imageInfo;
@@ -131,7 +112,7 @@ VkImage	kdo_createImageTexture(Kdo_Vulkan *vk, int width, int height)
 	imageInfo.arrayLayers			= 1;
 	imageInfo.samples				= VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.tiling				= VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage					= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.usage					= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	imageInfo.sharingMode			= VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.queueFamilyIndexCount	= 0;
 	imageInfo.pQueueFamilyIndices	= NULL;

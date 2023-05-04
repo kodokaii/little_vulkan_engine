@@ -19,7 +19,17 @@ int	main(int argc, char *argv[])
 	Kdo_Vulkan		vk						= {};
 	const char		*validationLayers[]		= {"VK_LAYER_KHRONOS_validation"};
 	const char		*deviceExtensions[]		= {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-	
+
+	Kdo_VkLoadMeshInfo	info[3];
+	Kdo_Vertex			vertex[] = {
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+};
+
 	(void) argc;
 	(void) argv;
 
@@ -68,32 +78,18 @@ int	main(int argc, char *argv[])
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);
 
-	Kdo_VkAddObjectInfo	info[2];
-	Kdo_Vertex			vertex[] = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-};
-
-	info[0].name			= "test";
-	info[0].count			= 2;
-	info[0].status			= 0;
-	info[0].vertexCount	= 6;
+	vk.render.vertex.usage	= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	vk.render.index.usage	= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	
+	info[0].count			= 6;
 	info[0].vertex			= vertex;
-	info[0].texturePath	= "textures/sky.png";
-
-	info[1].name			= "test";
-	info[1].count			= 2;
-	info[1].status			= 0;
-	info[1].vertexCount	= 6;
+	info[1].count			= 6;
 	info[1].vertex			= vertex;
-	info[1].texturePath	= "textures/sky.png";
-
-	kdo_addObjects(&vk, 1, info);
-	kdo_addObjects(&vk, 2, info);
+	info[2].count			= 6;
+	info[2].vertex			= vertex;
+	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 1, info);
+	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 3, info);
+	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 2, info);
 
 	kdo_cleanup(&vk, "Good !", 0);
 }

@@ -64,17 +64,6 @@ static void kdo_initDescriptor(Kdo_Vulkan *vk)
 		kdo_cleanup(vk, "Descriptor set allocation failed", 24);
 }
 
-static void	kdo_initMemoryType(Kdo_Vulkan *vk)
-{
-	VkMemoryRequirements	memRequirements;
-	VkImage					image;
-
-	image	= kdo_createImageTexture(vk, vk->physicalDevice.properties.limits.maxImageDimension2D, vk->physicalDevice.properties.limits.maxImageDimension2D);
-	vkGetImageMemoryRequirements(vk->device.path, image, &memRequirements);
-	vk->render.textureMemoryType = kdo_findMemoryType(vk, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	vkDestroyImage(vk->device.path, image, NULL);
-}
-
 void	kdo_initRender(Kdo_Vulkan *vk)
 {
 	VkCommandPoolCreateInfo	commandPoolInfo;
@@ -88,5 +77,4 @@ void	kdo_initRender(Kdo_Vulkan *vk)
 
 	kdo_initSampler(vk);	
 	kdo_initDescriptor(vk);
-	kdo_initMemoryType(vk);
 }

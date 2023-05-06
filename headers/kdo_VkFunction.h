@@ -19,7 +19,8 @@ VkFormat    kdo_findFormat(Kdo_Vulkan *vk, VkFormat *formats, uint32_t formatsCo
 uint32_t    kdo_findMemoryType(Kdo_Vulkan *vk, uint32_t typeFilter, VkMemoryPropertyFlags memoryFlags);
 void		kdo_beginUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer);
 void		kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer);
-VkBuffer    kdo_createBuffer(Kdo_Vulkan *vk, VkDeviceSize size, VkBufferUsageFlags usage);
-VkImage		kdo_createImageTexture(Kdo_Vulkan *vk, int width, int height);
+void		kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo);
+uint32_t    findTextureMemoryFiltrer(Kdo_Vulkan *vk);
+void		*kdo_mallocMerge(size_t sizeSrc1, void *src1, size_t sizeSrc2, void *src2);
 
 #endif

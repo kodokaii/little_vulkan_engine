@@ -75,9 +75,8 @@ typedef enum Kdo_VkObjectStatus
 
 typedef	struct Kdo_VkBufferDiv
 {
+	VkDeviceSize			elementSize;
 	uint32_t				count;
-	VkDeviceSize			size;
-	struct Kdo_VkBufferDiv	*next;
 }	Kdo_VkBufferDiv;
 
 typedef struct Kdo_VkImageDiv
@@ -85,15 +84,28 @@ typedef struct Kdo_VkImageDiv
 	VkExtent3D				extent;
 	VkDeviceSize			size;
 	VkImage					image;
-	struct Kdo_VkImageDiv	*next;
 }	Kdo_VkImageDiv;
 
-typedef	struct Kdo_VkAddDataInfo
+typedef struct Kdo_mergeImageInfo
 {
+	void			(*imageInfo)(VkExtent3D, VkImageCreateInfo*);
+	VkImageLayout	layout;
+}	Kdo_mergeImageInfo;
+
+typedef struct Kdo_mergeBufferToImageInfo
+{
+	void			(*imageInfo)(VkExtent3D, VkImageCreateInfo*);
+	VkImageLayout	layout;
+	uint32_t		imagesCount;
+	VkExtent3D		*extents;
+}	Kdo_mergeBufferToImageInfo;
+
+typedef	struct Kdo_VkLoadDataInfo
+{
+	VkDeviceSize	elementSize;
 	uint32_t		count;
-	VkDeviceSize	size;
 	void			*data;
-}	Kdo_VkAddDataInfo;
+}	Kdo_VkLoadDataInfo;
 
 typedef struct Kdo_VkLoadMeshInfo
 {
@@ -233,11 +245,12 @@ typedef struct Kdo_VkBuffer
 
 typedef	struct Kdo_VkImage
 {
-	VkFormat        format;
+	uint32_t		memoryFilter;
+	VkImageLayout	layout;
 	VkDeviceSize	size;
 	VkDeviceMemory	memory;
 	uint32_t		divCount;
-	Kdo_VkImageDiv	div;
+	Kdo_VkImageDiv	*div;
 }	Kdo_VkImage;
 
 typedef struct Kdo_VkObject

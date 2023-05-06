@@ -95,30 +95,47 @@ void	kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 	vkFreeCommandBuffers(vk->device.path, vk->render.transferPool, 1, commandBuffer);
 }
 
-VkImage	kdo_createImageTexture(Kdo_Vulkan *vk, int width, int height)
+void	kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo)
 {
-	VkImageCreateInfo	imageInfo;
-	VkImage				image;
+	imageInfo->sType					= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo->pNext					= NULL;
+	imageInfo->flags					= 0;
+	imageInfo->imageType				= VK_IMAGE_TYPE_2D;
+	imageInfo->format					= VK_FORMAT_R8G8B8A8_SRGB;
+	imageInfo->extent					= extent;
+	imageInfo->mipLevels				= 1;
+	imageInfo->arrayLayers				= 1;
+	imageInfo->samples					= VK_SAMPLE_COUNT_1_BIT;
+	imageInfo->tiling					= VK_IMAGE_TILING_OPTIMAL;
+	imageInfo->usage					= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo->sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo->queueFamilyIndexCount	= 0;
+	imageInfo->pQueueFamilyIndices		= NULL;
+	imageInfo->initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
+}
 
-	imageInfo.sType					= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.pNext					= NULL;
-	imageInfo.flags					= 0;
-	imageInfo.imageType				= VK_IMAGE_TYPE_2D;
-	imageInfo.format				= VK_FORMAT_R8G8B8A8_SRGB;
-	imageInfo.extent.width			= width;
-	imageInfo.extent.height			= height;
-	imageInfo.extent.depth			= 1;
-	imageInfo.mipLevels				= 1;
-	imageInfo.arrayLayers			= 1;
-	imageInfo.samples				= VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.tiling				= VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage					= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	imageInfo.sharingMode			= VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.queueFamilyIndexCount	= 0;
-	imageInfo.pQueueFamilyIndices	= NULL;
-	imageInfo.initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
-	if (vkCreateImage(vk->device.path, &imageInfo, NULL, &image) != VK_SUCCESS)
-		kdo_cleanup(vk, "Image texture creation failed", 25);
+uint32_t	findTextureMemoryFiltrer(Kdo_Vulkan *vk)
+{
+	VkImageCreateInfo		imageInfo;
+	VkExtent3D				extent	= {vk->physicalDevice.properties.limits.maxImageDimension2D, vk->physicalDevice.properties.limits.maxImageDimension2D, 1};
+	VkImage					image;
+	VkMemoryRequirements	memRequirements;
 
-	return (image);
+	kdo_imageTextureInfo(extent, &imageInfo);
+	vkCreateImage(vk->device.path, &imageInfo, NULL, &image);
+	vkGetImageMemoryRequirements(vk->device.path, image, &memRequirements);
+	vkDestroyImage(vk->device.path, image, NULL);
+
+	return (memRequirements.memoryTypeBits);
+}
+
+void	*kdo_mallocMerge(size_t sizeSrc1, void *src1, size_t sizeSrc2, void *src2)
+{
+	void	*dst;
+
+	dst = malloc(sizeSrc1 + sizeSrc2);
+	memcpy(dst, src1, sizeSrc1); 
+	memcpy(dst + sizeSrc1, src2, sizeSrc2);
+
+	return (dst);
 }

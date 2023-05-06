@@ -30,6 +30,8 @@ int	main(int argc, char *argv[])
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
 };
 
+	char				*texturesPath[]	= {"textures/sky.png", "textures/sky.png"};
+
 	(void) argc;
 	(void) argv;
 
@@ -77,6 +79,9 @@ int	main(int argc, char *argv[])
 
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);
+	
+	vk.render.textures.memoryFilter	= findTextureMemoryFiltrer(&vk);
+	vk.render.textures.layout		= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	vk.render.vertex.usage	= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	vk.render.index.usage	= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
@@ -87,9 +92,12 @@ int	main(int argc, char *argv[])
 	info[1].vertex			= vertex;
 	info[2].count			= 6;
 	info[2].vertex			= vertex;
-	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 1, info);
-	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 3, info);
-	kdo_loadMesh(&vk, &vk.render.vertex, &vk.render.index, 2, info);
+	kdo_pushMesh(&vk, &vk.render.vertex, &vk.render.index, 1, info);
+	kdo_pushMesh(&vk, &vk.render.vertex, &vk.render.index, 3, info);
+	kdo_pushMesh(&vk, &vk.render.vertex, &vk.render.index, 2, info);
+
+	kdo_pushTextures(&vk, &vk.render.textures, 1, texturesPath);
+	kdo_pushTextures(&vk, &vk.render.textures, 2, texturesPath);
 
 	kdo_cleanup(&vk, "Good !", 0);
 }

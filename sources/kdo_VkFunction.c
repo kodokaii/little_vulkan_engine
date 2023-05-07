@@ -61,7 +61,7 @@ void	kdo_beginUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 
 	allocInfo.sType					= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.pNext					= NULL;
-	allocInfo.commandPool			= vk->render.transferPool;
+	allocInfo.commandPool			= vk->core.transferPool;
 	allocInfo.level					= VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount	= 1;
 	if (vkAllocateCommandBuffers(vk->device.path, &allocInfo, commandBuffer) != VK_SUCCESS)
@@ -92,7 +92,7 @@ void	kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)
 	vkQueueSubmit(vk->device.queues[TRANSFER_QUEUE].path, 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(vk->device.queues[TRANSFER_QUEUE].path);
 
-	vkFreeCommandBuffers(vk->device.path, vk->render.transferPool, 1, commandBuffer);
+	vkFreeCommandBuffers(vk->device.path, vk->core.transferPool, 1, commandBuffer);
 }
 
 void	kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo)
@@ -112,6 +112,25 @@ void	kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo)
 	imageInfo->queueFamilyIndexCount	= 0;
 	imageInfo->pQueueFamilyIndices		= NULL;
 	imageInfo->initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+void	kdo_viewTextureInfo(VkImage image, VkImageViewCreateInfo *viewInfo)
+{
+	viewInfo->sType                              = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo->pNext                              = NULL;
+	viewInfo->flags                              = 0;
+	viewInfo->image                              = image;
+	viewInfo->viewType                           = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo->format                             = VK_FORMAT_R8G8B8A8_SRGB;
+	viewInfo->components.r                       = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo->components.g                       = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo->components.b                       = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo->components.a                       = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo->subresourceRange.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo->subresourceRange.baseMipLevel      = 0;
+	viewInfo->subresourceRange.levelCount        = 1;
+	viewInfo->subresourceRange.baseArrayLayer    = 0;
+	viewInfo->subresourceRange.layerCount        = 1;
 }
 
 uint32_t	findTextureMemoryFiltrer(Kdo_Vulkan *vk)

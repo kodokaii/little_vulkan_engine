@@ -20,6 +20,7 @@ uint32_t    kdo_findMemoryType(Kdo_Vulkan *vk, uint32_t typeFilter, VkMemoryProp
 void		kdo_beginUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer);
 void		kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer);
 void		kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo);
+void		kdo_viewTextureInfo(VkImage image, VkImageViewCreateInfo *viewInfo);
 uint32_t    findTextureMemoryFiltrer(Kdo_Vulkan *vk);
 void		*kdo_mallocMerge(size_t sizeSrc1, void *src1, size_t sizeSrc2, void *src2);
 

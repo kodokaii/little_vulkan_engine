@@ -9,7 +9,7 @@
 /*                        <kodokai.featheur@gmail.com>                                 */
 /* *********************************************************************************** */
 
-#include "kdo_VkRender.h"
+#include "kdo_VkCore.h"
 
 static void	kdo_initSampler(Kdo_Vulkan *vk)
 {
@@ -33,15 +33,14 @@ static void	kdo_initSampler(Kdo_Vulkan *vk)
 	samplerInfo.maxLod					= 0.0f;
 	samplerInfo.borderColor				= VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates	= VK_FALSE;
-	if (vkCreateSampler(vk->device.path, &samplerInfo, NULL, &vk->render.basicSampler) != VK_SUCCESS)
+	if (vkCreateSampler(vk->device.path, &samplerInfo, NULL, &vk->core.sampler.basic) != VK_SUCCESS)
 		kdo_cleanup(vk, "Sampler creation failed", 23);
 }
 
-static void kdo_initDescriptor(Kdo_Vulkan *vk)
+static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
 {
 	VkDescriptorPoolSize			descriptorPoolSize;
 	VkDescriptorPoolCreateInfo		descriptorPoolInfo;
-	VkDescriptorSetAllocateInfo     allocInfo;
 
 	descriptorPoolSize.type				= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descriptorPoolSize.descriptorCount	= 1;
@@ -49,22 +48,14 @@ static void kdo_initDescriptor(Kdo_Vulkan *vk)
 	descriptorPoolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptorPoolInfo.pNext			= NULL;
 	descriptorPoolInfo.flags			= 0;
-	descriptorPoolInfo.maxSets			= 1;
+	descriptorPoolInfo.maxSets			= 64;
 	descriptorPoolInfo.poolSizeCount	= 1;
 	descriptorPoolInfo.pPoolSizes		= &descriptorPoolSize;
-	if (vkCreateDescriptorPool(vk->device.path, &descriptorPoolInfo, NULL, &vk->render.descriptorPool) != VK_SUCCESS)
+	if (vkCreateDescriptorPool(vk->device.path, &descriptorPoolInfo, NULL, &vk->core.descriptorPool) != VK_SUCCESS)
 		kdo_cleanup(vk, "Descriptor pool creation failed", 23);
-
-	allocInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.pNext					= NULL;
-	allocInfo.descriptorPool		= vk->render.descriptorPool;
-	allocInfo.descriptorSetCount	= 1;
-	allocInfo.pSetLayouts			= &vk->graphicsPipeline.descriptorLayout;
-	if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &vk->render.descriptorSet) != VK_SUCCESS)
-		kdo_cleanup(vk, "Descriptor set allocation failed", 24);
 }
 
-void	kdo_initRender(Kdo_Vulkan *vk)
+void	kdo_initCore(Kdo_Vulkan *vk)
 {
 	VkCommandPoolCreateInfo	commandPoolInfo;
 
@@ -72,9 +63,17 @@ void	kdo_initRender(Kdo_Vulkan *vk)
 	commandPoolInfo.pNext               = NULL;
 	commandPoolInfo.flags               = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	commandPoolInfo.queueFamilyIndex    = vk->device.queues[TRANSFER_QUEUE].familyIndex;
-	if (vkCreateCommandPool(vk->device.path, &commandPoolInfo, NULL, &vk->render.transferPool) != VK_SUCCESS)
+	if (vkCreateCommandPool(vk->device.path, &commandPoolInfo, NULL, &vk->core.transferPool) != VK_SUCCESS)
 		kdo_cleanup(vk, "Transfer pool creation failed", 21);
 
+	vk->core.images.properties.memoryFilter = findTextureMemoryFiltrer(vk);
+    vk->core.images.properties.layout		= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    vk->core.images.properties.waitFlags	= WAIT_DEVICE;
+    vk->core.vertex.properties.usage		= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    vk->core.vertex.properties.waitFlags	= WAIT_DEVICE;
+    vk->core.index.properties.usage         = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    vk->core.index.properties.waitFlags		= WAIT_DEVICE;
+
 	kdo_initSampler(vk);	
-	kdo_initDescriptor(vk);
+	kdo_initDescriptorPool(vk);
 }

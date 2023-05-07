@@ -14,6 +14,6 @@
 
 # include "kdo_Vulkan.h"
 
-void    kdo_initRender(Kdo_Vulkan *vk);
+void    kdo_initCore(Kdo_Vulkan *vk);
 
 #endif

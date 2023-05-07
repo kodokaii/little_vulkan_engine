@@ -22,7 +22,7 @@
 # include "kdo_VkGraphicsPipeline.h"
 # include "kdo_VkFramebuffers.h"
 # include "kdo_VkSyncronisation.h"
-# include "kdo_VkRender.h"
+# include "kdo_VkCore.h"
 
 void    kdo_initVulkan(Kdo_Vulkan *vk);
 

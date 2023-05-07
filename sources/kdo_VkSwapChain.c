@@ -67,7 +67,7 @@ static VkPresentModeKHR	kdo_chooseSwapPresentMode(Kdo_Vulkan *vk)
 	return (VK_PRESENT_MODE_FIFO_KHR);
 }
 
-static void	kdo_initViewsSwapChain(Kdo_Vulkan *vk)
+void	kdo_initViewsSwapChain(Kdo_Vulkan *vk)
 {
 	VkImageViewCreateInfo		viewInfo;
 
@@ -130,7 +130,6 @@ void	kdo_initSwapChain(Kdo_Vulkan *vk)
 		kdo_cleanup(vk, "SwapChain creation failed", 6);
 
 	kdo_freePhysicalDevice(vk);
-	kdo_initViewsSwapChain(vk);
 }
 
 void	kdo_recreateSwapchain(Kdo_Vulkan *vk)
@@ -142,7 +141,9 @@ void	kdo_recreateSwapchain(Kdo_Vulkan *vk)
 	vkDeviceWaitIdle(vk->device.path);
 	
 	kdo_swapChainCleanup(vk);
+	kdo_initViewsSwapChain(vk);
 	kdo_initRenderPass(vk);
 	kdo_initFramebuffers(vk);
 	kdo_initSyncronisation(vk);
+	kdo_initRenderPool(vk);
 }

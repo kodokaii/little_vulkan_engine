@@ -13,5 +13,9 @@
 # define KDO_VKDISPLAY_H
 
 # include "kdo_Vulkan.h"
+# include "kdo_VkSwapChain.h"
+
+void    kdo_mainLoop(Kdo_Vulkan *vk);
+void    kdo_initRenderPool(Kdo_Vulkan *vk);
 
 #endif

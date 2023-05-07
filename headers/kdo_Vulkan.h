@@ -33,20 +33,20 @@
 # define ERRLOC			"CPU Memory allocation error"
 # define FOR_NO_ERROR	-1
 
-typedef struct Kdo_VkDepthBuffer
+typedef enum Kdo_VkWait
 {
-	VkImage			image;
-	VkDeviceMemory	memory;
-	VkImageView		view;
-	VkFormat		format;
-}	Kdo_VkDepthBuffer;
+	WAIT_DEVICE	= 0x00000001
+}	Kdo_VkWait;
 
-typedef struct Kdo_VkQueue
+typedef enum Kdo_VkObjectStatus
 {
-	VkQueue		path;
-	uint32_t	index;
-	uint32_t	familyIndex;
-}	Kdo_VkQueue;
+	INVISIBLE	= 0x00000001
+}	Kdo_VkObjectStatus;
+
+typedef struct Kdo_VkPush
+{
+	mat4	mvp;
+}	Kdo_VkPush;
 
 typedef struct Kdo_Vertex
 {
@@ -62,16 +62,49 @@ typedef struct Kdo_Shader
 	VkShaderModule  module;
 }	Kdo_Shader;
 
+typedef struct Kdo_VkDepthBuffer
+{
+	VkImage			image;
+	VkDeviceMemory	memory;
+	VkImageView		view;
+	VkFormat		format;
+}	Kdo_VkDepthBuffer;
+
+typedef struct Kdo_VkQueue
+{
+	VkQueue		path;
+	uint32_t	index;
+	uint32_t	familyIndex;
+}	Kdo_VkQueue;
+
 typedef struct Kdo_SynImage
 {
 	struct Kdo_SynImage	**path;
 	VkFence				*renderFinishedFence;
 }	Kdo_SynImage;
 
-typedef enum Kdo_VkObjectStatus
+typedef struct Kdo_VkBufferProperties
 {
-	Invisible	= 0x00000001
-}	Kdo_VkObjectStatus;
+	VkBufferUsageFlags	usage;
+	Kdo_VkWait			waitFlags;
+}	Kdo_VkBufferProperties;
+
+typedef struct Kdo_VkImageProperties
+{
+	uint32_t		memoryFilter;
+	VkImageLayout	layout;
+	Kdo_VkWait		waitFlags;
+}	Kdo_VkImageProperties;
+
+typedef struct Kdo_VkTransform
+{
+	mat4	path;
+	vec3	pos;
+	vec3	scale;
+	float	yaw;
+	float	pitch;
+	float	roll;
+}	Kdo_VkTransform;
 
 typedef	struct Kdo_VkBufferDiv
 {
@@ -84,21 +117,86 @@ typedef struct Kdo_VkImageDiv
 	VkExtent3D				extent;
 	VkDeviceSize			size;
 	VkImage					image;
+	VkImageView				view;
 }	Kdo_VkImageDiv;
 
-typedef struct Kdo_mergeImageInfo
+typedef struct Kdo_VkObjectDiv
 {
-	void			(*imageInfo)(VkExtent3D, VkImageCreateInfo*);
-	VkImageLayout	layout;
-}	Kdo_mergeImageInfo;
+	char					*name;
+	uint32_t				count;
+	Kdo_VkTransform			model;
+	Kdo_VkObjectStatus		status;
+	uint32_t				vertexIndex;
+	uint32_t				indexIndex;
+	uint32_t				textureIndex;
+	VkSampler				*sampler;
+	VkDescriptorSet			descripteurSet;
+	struct Kdo_VkObjectDiv	*next;
+}	Kdo_VkObjectDiv;
 
-typedef struct Kdo_mergeBufferToImageInfo
+typedef struct Kdo_VkLoadObjectInfo
+{
+	char					*name;
+	uint32_t				objectsCount;
+	char					*texturePath;
+	uint32_t				vertexCount;
+	Kdo_Vertex				vertex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkLoadObjectInfo;
+
+typedef struct Kdo_VkLoadObjectInfo_V
+{
+	char					*name;
+	uint32_t				objectsCount;
+	char					*texturePath;
+	uint32_t				vertexIndex;
+	uint32_t				indexIndex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkLoadObjectInfo_V;
+
+typedef struct Kdo_VkLoadObjectInfo_T
+{
+	char					*name;
+	uint32_t				objectsCount;
+	uint32_t				textureIndex;
+	uint32_t				vertexCount;
+	Kdo_Vertex				vertex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkLoadObjectInfo_T;
+
+typedef struct Kdo_VkLoadObjectInfo_VT
+{
+	char					*name;
+	uint32_t				objectsCount;
+	uint32_t				vertexIndex;
+	uint32_t				indexIndex;
+	uint32_t				textureIndex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkLoadObjectInfo_VT;
+
+typedef struct Kdo_VkImageInfoFunc
 {
 	void			(*imageInfo)(VkExtent3D, VkImageCreateInfo*);
-	VkImageLayout	layout;
-	uint32_t		imagesCount;
-	VkExtent3D		*extents;
-}	Kdo_mergeBufferToImageInfo;
+	void			(*viewInfo)(VkImage,VkImageViewCreateInfo*);
+}	Kdo_VkImageInfoFunc;
+
+typedef struct Kdo_VkMergeImageInfo
+{
+	Kdo_VkImageInfoFunc func;
+	VkImageLayout       layout;
+}	Kdo_VkMergeImageInfo;
+
+typedef struct Kdo_VkMergeBufferToImageInfo
+{
+	Kdo_VkImageInfoFunc	func;
+	VkImageLayout		layout;
+	uint32_t			imagesCount;
+	VkExtent3D			*extents;
+}	Kdo_VkMergeBufferToImageInfo;
 
 typedef	struct Kdo_VkLoadDataInfo
 {
@@ -235,57 +333,64 @@ typedef struct Kdo_VkFence
 
 typedef struct Kdo_VkBuffer
 {
-	VkBuffer			buffer;
-	VkBufferUsageFlags	usage;
-	VkDeviceSize		size;
-	VkDeviceMemory		memory;
-	uint32_t			divCount;
-	Kdo_VkBufferDiv		*div;
+	Kdo_VkBufferProperties	properties;
+	VkBuffer				buffer;
+	VkDeviceSize			size;
+	VkDeviceMemory			memory;
+	uint32_t				divCount;
+	Kdo_VkBufferDiv			*div;
 }	Kdo_VkBuffer;
 
 typedef	struct Kdo_VkImage
 {
-	uint32_t		memoryFilter;
-	VkImageLayout	layout;
-	VkDeviceSize	size;
-	VkDeviceMemory	memory;
-	uint32_t		divCount;
-	Kdo_VkImageDiv	*div;
+	Kdo_VkImageProperties	properties;
+	VkDeviceSize			size;
+	VkDeviceMemory			memory;
+	uint32_t				divCount;
+	Kdo_VkImageDiv			*div;
 }	Kdo_VkImage;
+
+typedef struct Kdo_VkSampler
+{
+	VkSampler	basic;
+}	Kdo_VkSampler;
 
 typedef struct Kdo_VkObject
 {
-	char				*name;
-	uint32_t			count;
-	mat4				*model;
-	Kdo_VkObjectStatus	status;
-	uint32_t			vertex;
-	uint32_t			index;
-	uint32_t			texture;
-	struct Kdo_VkObject	*next;
+	Kdo_VkBuffer	*vertex;
+	Kdo_VkBuffer	*index;
+	Kdo_VkImage		*images;
+	uint32_t		divCount;
+	Kdo_VkObjectDiv	*div;
 }	Kdo_VkObject;
 
-typedef struct Kdo_VkRender
+typedef struct Kdo_VkCore
 {
 	VkCommandPool		transferPool;
 	VkDescriptorPool	descriptorPool;
-	VkDescriptorSet		descriptorSet;
-	VkSampler			basicSampler;
 	Kdo_VkBuffer		vertex;
 	Kdo_VkBuffer		index;
-	Kdo_VkImage			textures;
-	uint32_t			objectsCount;
-	Kdo_VkObject		*objects;
-}	Kdo_VkRender;
+	Kdo_VkImage			images;
+	Kdo_VkSampler		sampler;
+	Kdo_VkObject		objects;
+}	Kdo_VkCore;
+
+typedef struct Kdo_VkRenderPool
+{
+	VkCommandPool	path;
+	VkCommandBuffer	main;
+}	Kdo_VkRenderPool;
 
 typedef struct Kdo_VkDisplay
 {
-	uint32_t		currentImage;
-	uint32_t		currentFrame;
-	uint32_t		maxParallelFrame;
-	uint32_t		windowResized;
-	Kdo_SynImage	*frameToImage;
-	Kdo_SynImage	**imageToFrame;
+	Kdo_VkRenderPool	*renderPool;
+	uint32_t			currentImage;
+	uint32_t			currentFrame;
+	uint32_t			maxParallelFrame;
+	uint32_t			windowResized;
+	Kdo_SynImage		*frameToImage;
+	Kdo_SynImage		**imageToFrame;
+	Kdo_VkPush			push;
 }	Kdo_VkDisplay;
 
 typedef struct Kdo_VkCamera
@@ -314,7 +419,7 @@ typedef struct Kdo_Vulkan
 	Kdo_VkFramebuffer		framebuffer;
 	Kdo_VkSemaphore			semaphore;
 	Kdo_VkFence				fence;
-	Kdo_VkRender			render;
+	Kdo_VkCore				core;
 	Kdo_VkDisplay			display;
 	Kdo_VkCamera			camera;
 }	Kdo_Vulkan;

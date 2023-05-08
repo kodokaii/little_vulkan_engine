@@ -64,15 +64,15 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 	vk->camera.yMouse = yCurrentMousse;
 }
 
-static void	kdo_updateRenderCommand(Kdo_Vulkan *vk)
+static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 {
 	VkCommandBufferBeginInfo		bufferBeginInfo;
 	VkViewport						viewport;
 	VkRect2D						scissor;
 	VkRenderPassBeginInfo			renderPassInfo;
-	VkClearValue					clearColor[2] = {};
-	VkBuffer						vertexBuffers[] = {vk->core.vertex.buffer};
-	VkDeviceSize					vertexOffsets[] = {0};
+	VkClearValue					clearColor[2]	= {};
+	Kdo_VkObjectDiv                 **current;
+	Kdo_VkPush						push;
 
 	clearColor[0].color.float32[3]		= 1.0f;
 	clearColor[1].depthStencil.depth	= 1.0f;
@@ -95,9 +95,6 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk)
 	scissor.offset.y	= 0;
 	scissor.extent		= vk->swapChain.imagesExtent;
 
-	kdo_updateCamera(vk);
-	glm_mat4_copy(vk->camera.path, vk->display.push.mvp);
-
 	if (vkBeginCommandBuffer(vk->display.renderPool[vk->display.currentImage].main, &bufferBeginInfo) != VK_SUCCESS)
 		kdo_cleanup(vk, "Start recording command buffer failed", 30);
 
@@ -115,11 +112,27 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk)
 	vkCmdSetViewport(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &viewport);
 	vkCmdSetScissor(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &scissor);
 	vkCmdBindPipeline(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.path);
-	vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, vertexBuffers, vertexOffsets);
-	vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, vk->core.index.buffer, 0, VK_INDEX_TYPE_UINT32);
-	vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkPush), &vk->display.push);
-	vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &vk->core.descriptorSet, 0, NULL);
-	vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, vk->core.index.div->count, 1, 0, 0, 0);
+
+	kdo_updateCamera(vk);
+	current = &objects->div;
+	for (uint32_t i = 0; i < objects->divCount; i++)
+	{
+		while ((*current)->status & INVISIBLE)
+			current = &(*current)->next;
+		
+		vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &objects->vertex->buffer, &(objects->vertex->div[(*current)->vertexIndex].offset));
+		vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, objects->index->buffer, objects->index->div[(*current)->indexIndex].offset, VK_INDEX_TYPE_UINT32);
+		vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &(*current)->descripteurSet, 0, NULL);
+
+		for (uint32_t j = 0; j < (*current)->count; j++)
+		{
+			glm_mat4_mul(vk->camera.path, (*current)->model[j].path, push.mvp);
+			vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkPush), &push);
+			vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, objects->index->div[(*current)->indexIndex].count, 1, 0, 0, 0);
+		}
+
+		current = &(*current)->next;
+	}
 
 	vkCmdEndRenderPass(vk->display.renderPool[vk->display.currentImage].main);
 
@@ -158,7 +171,7 @@ static void	kdo_drawFrame(Kdo_Vulkan *vk)
 	vk->display.imageToFrame[vk->display.currentImage] = vk->display.frameToImage + vk->display.currentFrame;
 	vk->display.frameToImage[vk->display.currentFrame].path = vk->display.imageToFrame + vk->display.currentImage;
 
-	kdo_updateRenderCommand(vk);
+	kdo_updateRenderCommand(vk, &vk->core.objects);
 
 	submitInfo.sType					= VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.pNext					= NULL;

@@ -25,6 +25,7 @@ void    kdo_freePhysicalDevice(Kdo_Vulkan *vk);
 void    kdo_swapChainCleanup(Kdo_Vulkan *vk);
 void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer);
 void    kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image);
+void    kdo_freeObject(Kdo_VkObject *object);
 void    kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode);
 
 #endif

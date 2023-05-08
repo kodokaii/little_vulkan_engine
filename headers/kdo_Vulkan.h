@@ -108,6 +108,7 @@ typedef struct Kdo_VkTransform
 
 typedef	struct Kdo_VkBufferDiv
 {
+	VkDeviceSize			offset;
 	VkDeviceSize			elementSize;
 	uint32_t				count;
 }	Kdo_VkBufferDiv;
@@ -124,7 +125,7 @@ typedef struct Kdo_VkObjectDiv
 {
 	char					*name;
 	uint32_t				count;
-	Kdo_VkTransform			model;
+	Kdo_VkTransform			*model;
 	Kdo_VkObjectStatus		status;
 	uint32_t				vertexIndex;
 	uint32_t				indexIndex;
@@ -133,50 +134,6 @@ typedef struct Kdo_VkObjectDiv
 	VkDescriptorSet			descripteurSet;
 	struct Kdo_VkObjectDiv	*next;
 }	Kdo_VkObjectDiv;
-
-typedef struct Kdo_VkLoadObjectInfo
-{
-	char					*name;
-	uint32_t				objectsCount;
-	char					*texturePath;
-	uint32_t				vertexCount;
-	Kdo_Vertex				vertex;
-	Kdo_VkObjectStatus      status;
-	VkSampler               *sampler;
-}	Kdo_VkLoadObjectInfo;
-
-typedef struct Kdo_VkLoadObjectInfo_V
-{
-	char					*name;
-	uint32_t				objectsCount;
-	char					*texturePath;
-	uint32_t				vertexIndex;
-	uint32_t				indexIndex;
-	Kdo_VkObjectStatus      status;
-	VkSampler               *sampler;
-}	Kdo_VkLoadObjectInfo_V;
-
-typedef struct Kdo_VkLoadObjectInfo_T
-{
-	char					*name;
-	uint32_t				objectsCount;
-	uint32_t				textureIndex;
-	uint32_t				vertexCount;
-	Kdo_Vertex				vertex;
-	Kdo_VkObjectStatus      status;
-	VkSampler               *sampler;
-}	Kdo_VkLoadObjectInfo_T;
-
-typedef struct Kdo_VkLoadObjectInfo_VT
-{
-	char					*name;
-	uint32_t				objectsCount;
-	uint32_t				vertexIndex;
-	uint32_t				indexIndex;
-	uint32_t				textureIndex;
-	Kdo_VkObjectStatus      status;
-	VkSampler               *sampler;
-}	Kdo_VkLoadObjectInfo_VT;
 
 typedef struct Kdo_VkImageInfoFunc
 {
@@ -210,6 +167,28 @@ typedef struct Kdo_VkLoadMeshInfo
 	uint32_t	count;
 	Kdo_Vertex	*vertex;
 }	Kdo_VkLoadMeshInfo;
+
+typedef struct Kdo_VkLoadObjectInfo
+{
+	char					*name;
+	uint32_t				objectsCount;
+	char					*texturePath;
+	uint32_t				vertexCount;
+	Kdo_Vertex				*vertex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkLoadObjectInfo;
+
+typedef struct Kdo_VkPushObjectInfo
+{
+	char					*name;
+	uint32_t				objectsCount;
+	uint32_t				vertexIndex;
+	uint32_t				indexIndex;
+	uint32_t				textureIndex;
+	Kdo_VkObjectStatus      status;
+	VkSampler               *sampler;
+}	Kdo_VkPushObjectInfo_VT;
 
 typedef struct Kdo_VkQueueInfo
 {
@@ -390,7 +369,6 @@ typedef struct Kdo_VkDisplay
 	uint32_t			windowResized;
 	Kdo_SynImage		*frameToImage;
 	Kdo_SynImage		**imageToFrame;
-	Kdo_VkPush			push;
 }	Kdo_VkDisplay;
 
 typedef struct Kdo_VkCamera

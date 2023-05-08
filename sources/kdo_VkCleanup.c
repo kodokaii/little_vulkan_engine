@@ -67,7 +67,10 @@ void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 void	kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image)
 {
 	for (uint32_t i = 0; i < image->divCount; i++)
+	{
 		KDO_DESTROY(vkDestroyImage, vk->device.path, image->div[i].image)
+		KDO_DESTROY(vkDestroyImageView, vk->device.path, image->div[i].view)
+	}
 	KDO_DESTROY(vkFreeMemory, vk->device.path, image->memory)
 	KDO_FREE(image->div)
 	image->properties.memoryFilter	= 0;
@@ -75,6 +78,26 @@ void	kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image)
 	image->properties.waitFlags		= 0;
 	image->size						= 0;
 	image->divCount					= 0;
+}
+
+void	kdo_freeObject(Kdo_VkObject *object)
+{
+	Kdo_VkObjectDiv	**current;	
+	Kdo_VkObjectDiv	**next;
+
+	current = &object->div;
+	while (*current)
+	{
+		next = &(*current)->next;
+		KDO_FREE((*current)->model);
+		KDO_FREE(*current);
+		current = next;
+	}
+	object->vertex		= NULL;
+	object->index		= NULL;
+	object->images		= NULL;
+	object->divCount	= 0;
+	object->div			= NULL;
 }
 
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
@@ -86,10 +109,11 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 
 	kdo_freeBuffer(vk, &vk->core.vertex);
 	kdo_freeBuffer(vk, &vk->core.index);
-	kdo_freeImage(vk, &vk->core.textures);
+	kdo_freeImage(vk, &vk->core.images);
+	kdo_freeObject(&vk->core.objects);
 
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->core.descriptorPool)
-	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->core.basicSampler)
+	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->core.sampler.basic)
 	KDO_DESTROY(vkDestroyCommandPool, vk->device.path, vk->core.transferPool)
 	KDO_DESTROY(vkDestroyShaderModule, vk->device.path, vk->graphicsPipeline.vertexShader.module)
 	KDO_DESTROY(vkDestroyShaderModule, vk->device.path, vk->graphicsPipeline.fragmentShader.module)

@@ -14,46 +14,14 @@
 #include "kdo_VkDisplay.h"
 #include "kdo_VkObject.h"
 
-static void provisoire(Kdo_Vulkan *vk)
-{
-	VkDescriptorSetAllocateInfo     allocInfo;
-	VkDescriptorImageInfo			imageInfo;
-	VkWriteDescriptorSet			descriptorWrite;
-
-	allocInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.pNext					= NULL;
-	allocInfo.descriptorPool		= vk->core.descriptorPool;
-	allocInfo.descriptorSetCount	= 1;
-	allocInfo.pSetLayouts			= &vk->graphicsPipeline.descriptorLayout;
-	if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &vk->core.descriptorSet) != VK_SUCCESS)
-		kdo_cleanup(vk, "Descriptor set allocation failed", 24);
-
-	imageInfo.sampler		= vk->core.basicSampler;
-	imageInfo.imageView		= imageView;
-	imageInfo.imageLayout	= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.pNext				= NULL;
-	descriptorWrite.dstSet				= vk->core.descriptorSet;
-	descriptorWrite.dstBinding			= 0;
-	descriptorWrite.dstArrayElement		= 0;
-	descriptorWrite.descriptorCount		= 1;
-	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrite.pImageInfo			= &imageInfo;
-	descriptorWrite.pBufferInfo			= NULL;
-	descriptorWrite.pTexelBufferView	= NULL;
-	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
-}
-
-
 int	main(int argc, char *argv[])
 {
 	Kdo_Vulkan		vk						= {};
 	const char		*validationLayers[]		= {"VK_LAYER_KHRONOS_validation"};
 	const char		*deviceExtensions[]		= {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-	Kdo_VkLoadMeshInfo	info[2];
-	Kdo_Vertex			vertex[] = {
+	Kdo_VkLoadObjectInfo	info[2];
+	Kdo_Vertex				vertex[] = {
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
     {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
     {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
@@ -61,8 +29,6 @@ int	main(int argc, char *argv[])
     {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
 };
-
-	char				*texturesPath[]	= {"textures/sky.png", "textures/sky.png"};
 
 	(void) argc;
 	(void) argv;
@@ -111,16 +77,26 @@ int	main(int argc, char *argv[])
 
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);
-	
-	info[0].count			= 6;
+
+	info[0].name			= "test1";
+	info[0].objectsCount	= 2;
+	info[0].texturePath		= "textures/sky.png";
+	info[0].vertexCount		= 6;
 	info[0].vertex			= vertex;
-	info[1].count			= 6;
+	info[0].status			= 0;
+	info[0].sampler			= &vk.core.sampler.basic;
+	info[1].name			= "test2";
+	info[1].objectsCount	= 1;
+	info[1].texturePath		= "textures/sky.png";
+	info[1].vertexCount		= 3;
 	info[1].vertex			= vertex;
-	kdo_pushMesh(&vk, &vk.core.vertex, &vk.core.index, 1, info);
-	kdo_pushTextures(&vk, &vk.core.textures, 1, texturesPath);
+	info[1].status			= 0;
+	info[1].sampler			= &vk.core.sampler.basic;
+	kdo_loadObject(&vk, &vk.core.objects, 1, info);	
+	
+	glm_translate_z(vk.core.objects.div->model[1].path, 1);
 
-	provisoire(&vk);
-
+	kdo_updateDescripteur(&vk, &vk.core.objects);
 	kdo_mainLoop(&vk);
 
 	kdo_cleanup(&vk, "Good !", 0);

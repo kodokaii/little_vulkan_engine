@@ -78,9 +78,6 @@ void	kdo_allocImage(Kdo_Vulkan *vk, Kdo_VkImage *image, VkMemoryPropertyFlags me
 		(*func.imageInfo)(image->div[i].extent, &imageInfo);
 		vkCreateImage(vk->device.path, &imageInfo, NULL, &image->div[i].image);
 
-		(*func.viewInfo)(image->div[i].image, &viewInfo);
-		vkCreateImageView(vk->device.path, &viewInfo, NULL, &image->div[i].view);
-
 		vkGetImageMemoryRequirements(vk->device.path, image->div[i].image, &memRequirements);
 		image->div[i].size	= memRequirements.size;
 		image->size			+= memRequirements.size;
@@ -97,6 +94,10 @@ void	kdo_allocImage(Kdo_Vulkan *vk, Kdo_VkImage *image, VkMemoryPropertyFlags me
 	for (i = 0; i < image->divCount; i++)
 	{
 		vkBindImageMemory(vk->device.path, image->div[i].image, image->memory, offset);
+
+		(*func.viewInfo)(image->div[i].image, &viewInfo);
+		vkCreateImageView(vk->device.path, &viewInfo, NULL, &image->div[i].view);
+
 		offset += image->div[i].size;
 	}
 }
@@ -112,6 +113,9 @@ Kdo_VkBuffer	kdo_mergeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc1, Kdo_VkBuf
 	bufferDst.divCount		= bufferSrc1->divCount + bufferSrc2->divCount;
 	if (!(bufferDst.div		= kdo_mallocMerge(bufferSrc1->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc1->div, bufferSrc2->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc2->div)))
 		kdo_cleanup(vk, ERRLOC, 12);
+
+	for (uint32_t i = bufferSrc1->divCount; i < bufferDst.divCount; i++)
+		bufferDst.div[i].offset += bufferSrc1->size;
 
 	kdo_allocBuffer(vk, &bufferDst, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -414,6 +418,7 @@ Kdo_VkBuffer	kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataInfo
 
 	for (i = 0; i < infoCount; i++)
 	{
+		bufferDst.div[i].offset			= bufferDst.size;
 		bufferDst.div[i].elementSize	= info[i].elementSize;
 		bufferDst.div[i].count			= info[i].count;
 
@@ -434,7 +439,7 @@ Kdo_VkBuffer	kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataInfo
 	return (bufferDst);
 }
 
-void	kdo_pushMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *indexBuffer, uint32_t infoCount, Kdo_VkLoadMeshInfo *info)
+void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *indexBuffer, uint32_t infoCount, Kdo_VkLoadMeshInfo *info)
 {
 	Kdo_VkBuffer		stagingBuffer;
 	Kdo_VkLoadDataInfo	*vertexInfo;
@@ -491,7 +496,7 @@ void	kdo_pushMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *inde
 	free(vertexInfo);
 }
 
-void	kdo_pushTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCount, char **texturesPath)
+void	kdo_loadTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCount, char **texturesPath)
 {
 	Kdo_VkBuffer					stagingBuffer;
 	Kdo_VkLoadDataInfo				*loadInfo;
@@ -515,6 +520,7 @@ void	kdo_pushTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCo
 	{
 		if (!(loadInfo[i].data		= stbi_load(texturesPath[i], &texWidth, &texHeight, &texChannels, STBI_rgb_alpha)))
 			kdo_cleanup(vk, "Textures load failed", 27);
+
 		loadInfo[i].count		= texWidth * texHeight;
 		loadInfo[i].elementSize	= 4;
 
@@ -530,7 +536,98 @@ void	kdo_pushTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCo
 	free(mergeInfo.extents);
 }
 
-void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t count, Kdo_VkLoadObjectInfo *info)
+void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kdo_VkLoadObjectInfo *info)
 {
+	VkDescriptorSetAllocateInfo     allocInfo;
+	Kdo_VkObjectDiv					**current;
+	Kdo_VkLoadMeshInfo				*meshInfo;
+	char							**texturesPath;
+	uint32_t						i;
 
+	allocInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.pNext					= NULL;
+	allocInfo.descriptorPool		= vk->core.descriptorPool;
+	allocInfo.descriptorSetCount	= 1;
+	allocInfo.pSetLayouts			= &vk->graphicsPipeline.descriptorLayout;
+
+	if (!(meshInfo = malloc(infoCount * sizeof(Kdo_VkLoadMeshInfo))))
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (!(texturesPath = malloc(infoCount * sizeof(char *))))
+		kdo_cleanup(vk, ERRLOC, 12);
+
+	current = &object->div;
+	while (*current)
+		current = &(*current)->next;
+
+	for (i = 0; i < infoCount; i++)
+	{
+		if (!(*current = malloc(sizeof(Kdo_VkObjectDiv))))
+			kdo_cleanup(vk, ERRLOC, 12);
+
+		(*current)->name			= info[i].name;
+		(*current)->count			= info[i].objectsCount;
+		(*current)->status			= info[i].status;
+		(*current)->vertexIndex		= object->vertex->divCount + i;
+		(*current)->indexIndex		= object->index->divCount + i;
+		(*current)->textureIndex	= object->images->divCount + i;
+		(*current)->sampler			= info[i].sampler;
+		(*current)->next			= NULL;
+
+		if (!((*current)->model		= malloc(info[i].objectsCount * sizeof(Kdo_VkTransform))))
+			kdo_cleanup(vk, ERRLOC, 12);
+
+		for (uint32_t j = 0; j < info[i].objectsCount; j++)
+		{
+			glm_mat4_identity((*current)->model[j].path);
+			glm_vec3_zero((*current)->model[j].pos);
+			glm_vec3_one((*current)->model[j].scale);
+			(*current)->model[j].yaw	= 0.0f;
+			(*current)->model[j].pitch	= 0.0f;
+			(*current)->model[j].roll	= 0.0f;
+		}
+		
+		if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &(*current)->descripteurSet) != VK_SUCCESS)
+			kdo_cleanup(vk, "Descriptor set allocation failed", 35);
+
+		meshInfo[i].count	= info[i].vertexCount;
+		meshInfo[i].vertex	= info[i].vertex;
+		texturesPath[i]		= info[i].texturePath;
+
+		current = &(*current)->next;
+	}
+	kdo_loadMesh(vk, object->vertex, object->index, infoCount, meshInfo);
+	kdo_loadTextures(vk, object->images, infoCount, texturesPath);
+	object->divCount	+= infoCount;
+
+	free(meshInfo);
+	free(texturesPath);
+}
+
+void	kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object)
+{
+	Kdo_VkObjectDiv			**current;
+	VkDescriptorImageInfo	imageInfo;
+	VkWriteDescriptorSet	descriptorWrite;
+
+	current = &object->div;
+	while (*current)
+	{
+		imageInfo.sampler		= *(*current)->sampler;
+		imageInfo.imageView		= object->images->div[(*current)->textureIndex].view;
+		imageInfo.imageLayout	= object->images->properties.layout;;
+
+		descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.pNext				= NULL;
+		descriptorWrite.dstSet				= (*current)->descripteurSet;
+		descriptorWrite.dstBinding			= 0;
+		descriptorWrite.dstArrayElement		= 0;
+		descriptorWrite.descriptorCount		= 1;
+		descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.pImageInfo			= &imageInfo;
+		descriptorWrite.pBufferInfo			= NULL;
+		descriptorWrite.pTexelBufferView	= NULL;
+		vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
+
+		current = &(*current)->next;
+	}
 }

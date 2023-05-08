@@ -24,5 +24,8 @@ void			kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *in
 void			kdo_loadTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCount, char **texturesPath);
 void		    kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kdo_VkLoadObjectInfo *info);
 void			kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object);
+Kdo_VkObjectDiv *kdo_getObject(Kdo_VkObject *object, uint32_t index);
+void			kdo_changeObjectCount(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t index, uint32_t count);
+void			kdo_updateModel(Kdo_VkTransform *model, uint32_t count);
 
 #endif

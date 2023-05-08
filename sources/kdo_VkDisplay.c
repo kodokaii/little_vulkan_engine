@@ -11,59 +11,6 @@
 
 #include "kdo_VkDisplay.h"
 
-static void	kdo_updateCamera(Kdo_Vulkan *vk)
-{
-	float	speed		= 0.1f;
-	float	sensitivity	= glm_rad(0.15f);
-	double	yCurrentMousse;
-	double	xCurrentMousse;
-	vec3	watch;
-	vec3	right;
-	vec3	front;
-	vec3	top = {0.0f, 0.0f, -1.0f};
-	mat4	view;
-	mat4	proj;
-
-	glfwGetCursorPos(vk->window.path, &xCurrentMousse, &yCurrentMousse);
-	vk->camera.yaw	= vk->camera.yaw + ((xCurrentMousse - vk->camera.xMouse) * sensitivity);
-	vk->camera.pitch	= glm_clamp(vk->camera.pitch + ((yCurrentMousse - vk->camera.yMouse) * sensitivity), glm_rad(-89.99), glm_rad(89.99));
-	watch[0] = cos(vk->camera.pitch) * cos(vk->camera.yaw);
-	watch[1] = cos(vk->camera.pitch) * sin(vk->camera.yaw);
-	watch[2] = sin(vk->camera.pitch);
-
-	glm_vec3_crossn(watch, top, right);
-	glm_vec3_crossn(top, right, front);
-
-	glm_vec3_scale(top, speed, top);
-	glm_vec3_scale(right, speed, right);
-	glm_vec3_scale(front, speed, front);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_W)) == GLFW_PRESS)
-		glm_vec3_add(vk->camera.pos, front, vk->camera.pos);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_S)) == GLFW_PRESS)
-		glm_vec3_sub(vk->camera.pos, front, vk->camera.pos);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_D)) == GLFW_PRESS)
-		glm_vec3_add(vk->camera.pos, right, vk->camera.pos);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_A)) == GLFW_PRESS)
-		glm_vec3_sub(vk->camera.pos, right, vk->camera.pos);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_SPACE)) == GLFW_PRESS)
-		glm_vec3_add(vk->camera.pos, top, vk->camera.pos);
-
-	if ((glfwGetKey(vk->window.path, GLFW_KEY_LEFT_CONTROL)) == GLFW_PRESS)
-		glm_vec3_sub(vk->camera.pos, top, vk->camera.pos);
-	
-	glm_look(vk->camera.pos, watch, GLM_ZUP, view);
-	glm_perspective(glm_rad(60.0f), vk->swapChain.imagesExtent.width / vk->swapChain.imagesExtent.height, 0.1f, 50.0f, proj);
-	glm_mat4_mul(proj, view, vk->camera.path);
-
-	vk->camera.xMouse = xCurrentMousse;
-	vk->camera.yMouse = yCurrentMousse;
-}
-
 static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 {
 	VkCommandBufferBeginInfo		bufferBeginInfo;
@@ -113,7 +60,6 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 	vkCmdSetScissor(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &scissor);
 	vkCmdBindPipeline(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.path);
 
-	kdo_updateCamera(vk);
 	current = &objects->div;
 	for (uint32_t i = 0; i < objects->divCount; i++)
 	{
@@ -171,6 +117,7 @@ static void	kdo_drawFrame(Kdo_Vulkan *vk)
 	vk->display.imageToFrame[vk->display.currentImage] = vk->display.frameToImage + vk->display.currentFrame;
 	vk->display.frameToImage[vk->display.currentFrame].path = vk->display.imageToFrame + vk->display.currentImage;
 
+	kdo_compute(vk);
 	kdo_updateRenderCommand(vk, &vk->core.objects);
 
 	submitInfo.sType					= VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -204,21 +151,6 @@ static void	kdo_drawFrame(Kdo_Vulkan *vk)
 	vk->display.currentFrame = (vk->display.currentFrame + 1) % vk->display.maxParallelFrame;
 }
 
-void	kdo_mainLoop(Kdo_Vulkan *vk)
-{
-	kdo_initRenderPool(vk);
-	glfwGetCursorPos(vk->window.path, &vk->camera.xMouse, &vk->camera.yMouse);
-	glm_vec3_copy(vk->info.startPos, vk->camera.pos);
-	vk->camera.yaw		= vk->info.startYaw;
-	vk->camera.pitch	= vk->info.startPitch;
-
-	while (!glfwWindowShouldClose(vk->window.path))
-	{
-		glfwPollEvents();
-		kdo_drawFrame(vk);
-	}
-}
-
 void	kdo_initRenderPool(Kdo_Vulkan *vk)
 {
 	VkCommandPoolCreateInfo			commandPoolInfo;
@@ -245,5 +177,20 @@ void	kdo_initRenderPool(Kdo_Vulkan *vk)
 		bufferAllocInfo.level		= VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		if (vkAllocateCommandBuffers(vk->device.path, &bufferAllocInfo, &vk->display.renderPool[i].main) != VK_SUCCESS)
 			kdo_cleanup(vk, "Render command Buffers allocation failed", 29);
+	}
+}
+
+void	kdo_mainLoop(Kdo_Vulkan *vk)
+{
+	kdo_initRenderPool(vk);
+	glfwGetCursorPos(vk->window.path, &vk->camera.xMouse, &vk->camera.yMouse);
+	glm_vec3_copy(vk->info.startPos, vk->camera.pos);
+	vk->camera.yaw		= vk->info.startYaw;
+	vk->camera.pitch	= vk->info.startPitch;
+
+	while (!glfwWindowShouldClose(vk->window.path))
+	{
+		glfwPollEvents();
+		kdo_drawFrame(vk);
 	}
 }

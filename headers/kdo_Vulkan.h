@@ -382,7 +382,6 @@ typedef struct Kdo_VkCamera
 	float	pitch;
 } Kdo_VkCamera;
 
-
 typedef struct Kdo_Vulkan
 {
 	Kdo_VkInitInfo			info;

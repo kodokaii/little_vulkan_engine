@@ -20,16 +20,6 @@ int	main(int argc, char *argv[])
 	const char		*validationLayers[]		= {"VK_LAYER_KHRONOS_validation"};
 	const char		*deviceExtensions[]		= {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-	Kdo_VkLoadObjectInfo	info[2];
-	Kdo_Vertex				vertex[] = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
-};
-
 	(void) argc;
 	(void) argv;
 
@@ -77,26 +67,6 @@ int	main(int argc, char *argv[])
 
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);
-
-	info[0].name			= "test1";
-	info[0].objectsCount	= 2;
-	info[0].texturePath		= "textures/sky.png";
-	info[0].vertexCount		= 6;
-	info[0].vertex			= vertex;
-	info[0].status			= 0;
-	info[0].sampler			= &vk.core.sampler.basic;
-	info[1].name			= "test2";
-	info[1].objectsCount	= 1;
-	info[1].texturePath		= "textures/sky.png";
-	info[1].vertexCount		= 3;
-	info[1].vertex			= vertex;
-	info[1].status			= 0;
-	info[1].sampler			= &vk.core.sampler.basic;
-	kdo_loadObject(&vk, &vk.core.objects, 1, info);	
-	
-	glm_translate_z(vk.core.objects.div->model[1].path, 1);
-
-	kdo_updateDescripteur(&vk, &vk.core.objects);
 	kdo_mainLoop(&vk);
 
 	kdo_cleanup(&vk, "Good !", 0);

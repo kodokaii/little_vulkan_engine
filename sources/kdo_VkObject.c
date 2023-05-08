@@ -35,6 +35,16 @@ static uint32_t	kdo_countUniqueVertex(VkDeviceSize vertexCount, Kdo_Vertex *vert
 	return (uniqueVertexCount);
 }
 
+static void	kdo_initTransform(Kdo_VkTransform *transform)
+{
+	glm_mat4_identity(transform->path);
+	glm_vec3_zero(transform->pos);
+	glm_vec3_one(transform->scale);
+	transform->yaw		= 0.0f;
+	transform->pitch	= 0.0f;
+	transform->roll		= 0.0f;
+}
+
 void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, VkMemoryPropertyFlags memoryFlags)
 {
 	VkBufferCreateInfo		bufferInfo;
@@ -108,10 +118,11 @@ Kdo_VkBuffer	kdo_mergeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc1, Kdo_VkBuf
 	VkCommandBuffer			copy;
 	VkBufferCopy			copyInfo;
 
-	bufferDst.properties.usage			= bufferSrc1->properties.usage | bufferSrc2->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	bufferDst.size			= bufferSrc1->size + bufferSrc2->size;
-	bufferDst.divCount		= bufferSrc1->divCount + bufferSrc2->divCount;
-	if (!(bufferDst.div		= kdo_mallocMerge(bufferSrc1->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc1->div, bufferSrc2->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc2->div)))
+	bufferDst.properties.usage		= bufferSrc1->properties.usage | bufferSrc2->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bufferDst.properties.waitFlags	= bufferSrc1->properties.waitFlags | bufferSrc2->properties.waitFlags;
+	bufferDst.size					= bufferSrc1->size + bufferSrc2->size;
+	bufferDst.divCount				= bufferSrc1->divCount + bufferSrc2->divCount;
+	if (!(bufferDst.div				= kdo_mallocMerge(bufferSrc1->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc1->div, bufferSrc2->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc2->div)))
 		kdo_cleanup(vk, ERRLOC, 12);
 
 	for (uint32_t i = bufferSrc1->divCount; i < bufferDst.divCount; i++)
@@ -137,10 +148,6 @@ Kdo_VkBuffer	kdo_mergeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc1, Kdo_VkBuf
 		vkCmdCopyBuffer(copy, bufferSrc2->buffer, bufferDst.buffer, 1, &copyInfo);
 	}
 	kdo_endUniqueCommand(vk, &copy);
-
-	if ((bufferSrc1->properties.waitFlags | bufferSrc2->properties.waitFlags) & WAIT_DEVICE)
-		vkDeviceWaitIdle(vk->device.path);
-
 	kdo_freeBuffer(vk, bufferSrc1);
 	kdo_freeBuffer(vk, bufferSrc2);
 
@@ -158,6 +165,7 @@ Kdo_VkImage	kdo_mergeImage(Kdo_Vulkan *vk, Kdo_VkImage *imageSrc1, Kdo_VkImage *
 
 	imageDst.properties.memoryFilter	= imageSrc1->properties.memoryFilter & imageSrc2->properties.memoryFilter;
 	imageDst.properties.layout			= info.layout;
+	imageDst.properties.waitFlags		= imageSrc1->properties.waitFlags | imageSrc2->properties.waitFlags;
 	imageDst.divCount		= imageSrc1->divCount + imageSrc2->divCount;
 	if (!(imageDst.div		= kdo_mallocMerge(imageSrc1->divCount * sizeof(Kdo_VkImageDiv), imageSrc1->div, imageSrc2->divCount * sizeof(Kdo_VkImageDiv), imageSrc2->div)))
 		kdo_cleanup(vk, ERRLOC, 12);
@@ -265,10 +273,6 @@ Kdo_VkImage	kdo_mergeImage(Kdo_Vulkan *vk, Kdo_VkImage *imageSrc1, Kdo_VkImage *
 
 	kdo_endUniqueCommand(vk, &copy);
 	free(imageBarrierInfo);
-
-	if ((imageSrc1->properties.waitFlags | imageSrc2->properties.waitFlags) & WAIT_DEVICE)
-		vkDeviceWaitIdle(vk->device.path);
-
 	kdo_freeImage(vk, imageSrc1);
 	kdo_freeImage(vk, imageSrc2);
 
@@ -282,12 +286,12 @@ Kdo_VkImage	kdo_mergeBufferToImage(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, Kdo_
 	VkImageMemoryBarrier	*imageBarrierInfo;
 	VkImageCopy				copyImageInfo;
 	VkBufferImageCopy		copyBufferInfo;
-	VkDeviceSize			offset;
 	uint32_t				i;
 	uint32_t				j;
 
 	imageDst.properties.memoryFilter	= imageSrc->properties.memoryFilter;
 	imageDst.properties.layout			= info.layout;
+	imageDst.properties.waitFlags		= imageSrc->properties.waitFlags;
 	imageDst.divCount					= imageSrc->divCount + info.imagesCount;
 	if (!(imageDst.div					= malloc(imageDst.divCount * sizeof(Kdo_VkImageDiv))))
 		kdo_cleanup(vk, ERRLOC, 12);
@@ -375,13 +379,11 @@ Kdo_VkImage	kdo_mergeBufferToImage(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, Kdo_
 		imageBarrierInfo[i].newLayout		= imageDst.properties.layout;
 	}
 
-	offset	= 0;
-	while (i < imageDst.divCount)
+	for (j = 0; j < bufferSrc->divCount; j++)
 	{
-		copyBufferInfo.bufferOffset	= offset;
+		copyBufferInfo.bufferOffset	= bufferSrc->div[j].offset;
         copyBufferInfo.imageExtent	= imageDst.div[i].extent;
         vkCmdCopyBufferToImage(copy, bufferSrc->buffer, imageDst.div[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyBufferInfo);
-		offset	+= imageDst.div[i].size;
 
 		imageBarrierInfo[i].srcAccessMask	= VK_ACCESS_TRANSFER_WRITE_BIT;
         imageBarrierInfo[i].dstAccessMask	= VK_ACCESS_SHADER_READ_BIT;
@@ -393,10 +395,6 @@ Kdo_VkImage	kdo_mergeBufferToImage(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, Kdo_
 
 	kdo_endUniqueCommand(vk, &copy);
 	free(imageBarrierInfo);
-	
-	if ((bufferSrc->properties.waitFlags | imageSrc->properties.waitFlags) & WAIT_DEVICE)
-		vkDeviceWaitIdle(vk->device.path);
-
 	kdo_freeBuffer(vk, bufferSrc);
 	kdo_freeImage(vk, imageSrc);
 
@@ -577,15 +575,8 @@ void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kd
 			kdo_cleanup(vk, ERRLOC, 12);
 
 		for (uint32_t j = 0; j < info[i].objectsCount; j++)
-		{
-			glm_mat4_identity((*current)->model[j].path);
-			glm_vec3_zero((*current)->model[j].pos);
-			glm_vec3_one((*current)->model[j].scale);
-			(*current)->model[j].yaw	= 0.0f;
-			(*current)->model[j].pitch	= 0.0f;
-			(*current)->model[j].roll	= 0.0f;
-		}
-		
+			kdo_initTransform((*current)->model + j);
+	
 		if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &(*current)->descripteurSet) != VK_SUCCESS)
 			kdo_cleanup(vk, "Descriptor set allocation failed", 35);
 
@@ -629,5 +620,54 @@ void	kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object)
 		vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
 
 		current = &(*current)->next;
+	}
+}
+
+Kdo_VkObjectDiv	*kdo_getObject(Kdo_VkObject *object, uint32_t index)
+{
+	Kdo_VkObjectDiv	*current;
+
+	current = object->div;
+	if (current)
+	{
+		while (index-- && current->next)
+			current = current->next;
+	}
+	return (current);
+}
+
+void	kdo_changeObjectCount(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t index, uint32_t count)
+{
+	Kdo_VkObjectDiv	*current;
+	Kdo_VkTransform	*model;
+
+	current = kdo_getObject(object, index);
+	
+	if (!(model = malloc(count * sizeof(Kdo_VkTransform))))
+		kdo_cleanup(vk, ERRLOC, 12);
+
+	if (current->count < count)
+	{
+		memcpy(model, current->model, current->count * sizeof(Kdo_VkTransform));
+		for (uint32_t i = current->count; i < count; i++)
+			kdo_initTransform(model + i);
+	}
+	else
+		memcpy(model, current->model, count * sizeof(Kdo_VkTransform));
+	
+	free(current->model);
+	current->model = model;
+	current->count = count;
+}
+
+void	kdo_updateModel(Kdo_VkTransform *model, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++)
+	{
+		glm_scale_make(model[i].path, model[i].scale);
+		glm_translate(model[i].path, model[i].pos);
+		glm_rotate(model[i].path, model[i].yaw, GLM_ZUP);
+		glm_rotate(model[i].path, model[i].pitch, GLM_XUP); 
+		glm_rotate(model[i].path, model[i].roll, GLM_YUP);
 	}
 }

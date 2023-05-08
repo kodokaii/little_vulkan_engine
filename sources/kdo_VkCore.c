@@ -43,12 +43,12 @@ static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
 	VkDescriptorPoolCreateInfo		descriptorPoolInfo;
 
 	descriptorPoolSize.type				= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorPoolSize.descriptorCount	= 16;
+	descriptorPoolSize.descriptorCount	= 128;
 
 	descriptorPoolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptorPoolInfo.pNext			= NULL;
 	descriptorPoolInfo.flags			= 0;
-	descriptorPoolInfo.maxSets			= 16;
+	descriptorPoolInfo.maxSets			= 128;
 	descriptorPoolInfo.poolSizeCount	= 1;
 	descriptorPoolInfo.pPoolSizes		= &descriptorPoolSize;
 	if (vkCreateDescriptorPool(vk->device.path, &descriptorPoolInfo, NULL, &vk->core.descriptorPool) != VK_SUCCESS)

@@ -55,6 +55,9 @@ void	kdo_swapChainCleanup(Kdo_Vulkan *vk)
 
 void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 {
+	if (buffer->properties.waitFlags & WAIT_DEVICE)
+        vkDeviceWaitIdle(vk->device.path);
+
     KDO_DESTROY(vkDestroyBuffer, vk->device.path, buffer->buffer)
     KDO_DESTROY(vkFreeMemory, vk->device.path, buffer->memory)
 	KDO_FREE(buffer->div)
@@ -66,6 +69,9 @@ void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 
 void	kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image)
 {
+	if (image->properties.waitFlags & WAIT_DEVICE)
+        vkDeviceWaitIdle(vk->device.path);
+
 	for (uint32_t i = 0; i < image->divCount; i++)
 	{
 		KDO_DESTROY(vkDestroyImage, vk->device.path, image->div[i].image)

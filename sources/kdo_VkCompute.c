@@ -11,6 +11,9 @@
 
 #include "kdo_VkCompute.h"
 
+#define FAST_OBJ_IMPLEMENTATION
+#include "objLoader/fast_obj.h"
+
 static void	kdo_updateCamera(Kdo_Vulkan *vk)
 {
 	float	speed		= 0.05f;
@@ -64,19 +67,12 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 	vk->camera.yMouse = yCurrentMousse;
 }
 
-
 void kdo_compute(Kdo_Vulkan *vk)
 {
 	double			currentTime	= glfwGetTime();
 	static double	time		= 0;
 	static int		start		= 1;
-	static uint32_t count		= 1;
-	static int		x			= 1;
-	static int		y			= 1;
-	static int		sign		= 1;
-	static int		cp			= 1;
 
-	Kdo_VkObjectDiv			*current;
 	Kdo_VkLoadObjectInfo    info[2];
     Kdo_Vertex              vertex[] = {
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
@@ -90,11 +86,25 @@ void kdo_compute(Kdo_Vulkan *vk)
 	if (0.00185f < currentTime - vk->camera.moveTime)
 	{
 		kdo_updateCamera(vk);
-		vk->camera.moveTime	= time;
+		vk->camera.moveTime	= currentTime;
 	}
 
 	if (start)
 	{
+		fastObjMesh* mesh = fast_obj_read("obj/viking_room.obj");
+
+		Kdo_Vertex *test = malloc(mesh->index_count * sizeof(Kdo_Vertex));
+
+		for(uint32_t i = 0; i < mesh->index_count; i++)
+		{
+			test[i].pos[0]	=	mesh->positions[mesh->indices[i].p * 3];
+			test[i].pos[1]	=	mesh->positions[mesh->indices[i].p * 3 + 1];
+			test[i].pos[2]	=	mesh->positions[mesh->indices[i].p * 3 + 2] * -1;
+			test[i].tex[0]	=	mesh->texcoords[mesh->indices[i].t * 2];
+			test[i].tex[1]	=	1.0f - mesh->texcoords[mesh->indices[i].t * 2 + 1];
+			glm_vec3_dup(GLM_VEC3_ONE, test[i].color);
+		}
+
 		info[0].name            = "brick";
 		info[0].objectsCount    = 1;
 		info[0].texturePath     = "textures/brick.jpg";
@@ -102,11 +112,11 @@ void kdo_compute(Kdo_Vulkan *vk)
 		info[0].vertex          = vertex;
 		info[0].status          = 0;
 		info[0].sampler         = &vk->core.sampler.basic;
-		info[1].name            = "sky";
+		info[1].name            = "house";
 		info[1].objectsCount    = 1;
-		info[1].texturePath     = "textures/sky.png";
-		info[1].vertexCount     = 3;
-		info[1].vertex          = vertex + 3;
+		info[1].texturePath     = "textures/viking_room.png";
+		info[1].vertexCount     = mesh->index_count;
+		info[1].vertex          = test;
 		info[1].status          = 0;
 		info[1].sampler         = &vk->core.sampler.basic;
 		kdo_loadObject(vk, &vk->core.objects, 2, info);
@@ -114,43 +124,15 @@ void kdo_compute(Kdo_Vulkan *vk)
 		start = 0;
 	}
 
-	if (count < 421 && 0.03 < currentTime - time )
+	if (1 < currentTime - time)
 	{
+		Kdo_VkObjectDiv	*current = kdo_getObject(&vk->core.objects, 1);
+		kdo_changeObjectCount(vk, &vk->core.objects, 1, current->count + 1);
+	
+		current->model[current->count - 1].pos[2] = current->model[current->count - 2].pos[2] + 1.5f;
 
-		kdo_changeObjectCount(vk, &vk->core.objects, 0, count + 1);	
-		kdo_changeObjectCount(vk, &vk->core.objects, 1, count + 1);	
-
-		current = kdo_getObject(&vk->core.objects, 0);
-
-		
-		glm_vec3_dup(current->model[count - 1].pos, current->model[count].pos);
-		glm_vec3_dup(current->next->model[count - 1].pos, current->next->model[count].pos);
-
-		if (x)
-		{
-			current->model[count].pos[0] += sign;
-			current->next->model[count].pos[0] += sign;
-			x--;
-		}
-		else if (y)
-		{
-			current->model[count].pos[1] += sign;
-			current->next->model[count].pos[1] += sign;
-			y--;
-		}
-
-		if (!y)
-		{
-			cp++;
-			x = cp;
-			y = cp;
-			sign *= -1;
-		}
-
-		kdo_updateModel(current->model, count);
-		kdo_updateModel(current->next->model, count);
-		
+		kdo_updateModel(current->model + current->count - 1, 1);
 		time = currentTime;
-		count++;
 	}
+
 }

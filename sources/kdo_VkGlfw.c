@@ -32,7 +32,7 @@ void	kdo_initGlfw(Kdo_Vulkan *vk)
 
 	glfwSetWindowUserPointer(vk->window.path, vk);
 	glfwSetFramebufferSizeCallback(vk->window.path, kdo_windowResized);
-//	glfwSetInputMode (vk->window.path, GLFW_CURSOR , GLFW_CURSOR_DISABLED);
+	glfwSetInputMode (vk->window.path, GLFW_CURSOR , GLFW_CURSOR_DISABLED);
 
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionsCount);
 	if (!(extensions = malloc((vk->info.instanceExtensionsCount + glfwExtensionsCount) * sizeof(char *))))

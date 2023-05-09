@@ -443,9 +443,9 @@ void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *inde
 	Kdo_VkLoadDataInfo	*vertexInfo;
 	Kdo_VkLoadDataInfo	*indexInfo;
 	uint32_t			currentIndex;
+	uint32_t			currentVertex;
 	uint32_t			vertexCount;
 	uint32_t			i;
-	uint32_t			j;
 
 	if (!(vertexInfo = malloc(infoCount * sizeof(Kdo_VkLoadDataInfo))))
 		kdo_cleanup(vk, ERRLOC, 12);	
@@ -465,17 +465,17 @@ void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *inde
 			kdo_cleanup(vk, ERRLOC, 12);
 
 		vertexCount = 0;
-		for (j = 0; j < info[i].count; j++)
+		for (currentVertex = 0; currentVertex < info[i].count; currentVertex++)
 		{
-			for (currentIndex = 0; currentIndex < j && !kdo_vertexEqv(info[i].vertex[j], info[i].vertex[currentIndex]); currentIndex++);
-			if (currentIndex == j)
+			for (currentIndex = 0; currentIndex < vertexCount && !kdo_vertexEqv(info[i].vertex[currentVertex], ((Kdo_Vertex *) vertexInfo[i].data)[currentIndex]); currentIndex++);
+			if (currentIndex == vertexCount)
 			{
-				((Kdo_Vertex *) vertexInfo[i].data)[vertexCount]	= info[i].vertex[j];
-				((uint32_t *) indexInfo[i].data)[j]					= vertexCount;
+				((Kdo_Vertex *) vertexInfo[i].data)[vertexCount]	= info[i].vertex[currentVertex];
+				((uint32_t *) indexInfo[i].data)[currentVertex]		= vertexCount;
 				vertexCount++;
 			}
 			else
-				((uint32_t *) indexInfo[i].data)[j]					= currentIndex;
+				((uint32_t *) indexInfo[i].data)[currentVertex]		= currentIndex;
 		}
 	}
 

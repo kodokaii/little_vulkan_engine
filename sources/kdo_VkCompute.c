@@ -91,7 +91,7 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (start)
 	{
-		fastObjMesh* mesh = fast_obj_read("obj/viking_room.obj");
+		fastObjMesh* mesh = fast_obj_read("obj/pyramid.obj");
 
 		Kdo_Vertex *test = malloc(mesh->index_count * sizeof(Kdo_Vertex));
 
@@ -108,7 +108,7 @@ void kdo_compute(Kdo_Vulkan *vk)
 		info[0].name            = "brick";
 		info[0].objectsCount    = 1;
 		info[0].texturePath     = "textures/brick.jpg";
-		info[0].vertexCount     = 3;
+		info[0].vertexCount     = 6;
 		info[0].vertex          = vertex;
 		info[0].status          = 0;
 		info[0].sampler         = &vk->core.sampler.basic;
@@ -124,12 +124,15 @@ void kdo_compute(Kdo_Vulkan *vk)
 		start = 0;
 	}
 
+
+
 	if (1 < currentTime - time)
 	{
 		Kdo_VkObjectDiv	*current = kdo_getObject(&vk->core.objects, 1);
 		kdo_changeObjectCount(vk, &vk->core.objects, 1, current->count + 1);
 	
 		current->model[current->count - 1].pos[2] = current->model[current->count - 2].pos[2] + 1.5f;
+		current->model[current->count - 1].yaw = current->model[current->count - 2].yaw + 0.2;
 
 		kdo_updateModel(current->model + current->count - 1, 1);
 		time = currentTime;

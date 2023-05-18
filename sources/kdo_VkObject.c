@@ -14,14 +14,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
-static float kdo_vec2Cmp(const vec2 vec1, const vec2 vec2)
+static float	kdo_vec2Cmp(const vec2 vec1, const vec2 vec2)
 {
 	if (vec1[0] != vec2[0])
-		return (vec1[0] < vec2[0]);
+		return (vec1[0] - vec2[0]);
 	return (vec1[1] - vec2[1]);
 }
 
-static float kdo_vec3Cmp(const vec3 vec1, const vec3 vec2)
+static float	kdo_vec3Cmp(const vec3 vec1, const vec3 vec2)
 {
 	if (vec1[0] != vec2[0])
 		return (vec1[0] - vec2[0]);
@@ -443,16 +443,15 @@ Kdo_VkBuffer	kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataInfo
 	return (bufferDst);
 }
 
-uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex , uint32_t count)
+uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex , uint32_t sortCount)
 {
 	uint32_t	beforeCount	= 0;
 	uint32_t	sameCount	= 1;
 	uint32_t	afterCount	= 0;
 	uint32_t	buffer;
-	uint32_t	i;
 	float		res;
 
-	while (beforeCount + sameCount + afterCount < count)
+	while (beforeCount + sameCount + afterCount < sortCount)
 	{
 		res = kdo_vertexCmp(vertex[sortIndex[beforeCount]], vertex[sortIndex[beforeCount + sameCount]]);
 
@@ -463,36 +462,29 @@ uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex 
 			sortIndex[beforeCount + sameCount]	= buffer;
 
 			index[sortIndex[beforeCount]]				-= sameCount;
-			index[sortIndex[beforeCount + sameCount]]	+= 1;
+			index[sortIndex[beforeCount + sameCount]]	+= sameCount;
 
 			beforeCount++;
 		}
 		else if (0 < res)
 		{
-			buffer								= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]	= sortIndex[count - afterCount - 1];
-			sortIndex[count - afterCount - 1]	= buffer;
+			buffer									= sortIndex[beforeCount + sameCount];
+			sortIndex[beforeCount + sameCount]		= sortIndex[sortCount - afterCount - 1];
+			sortIndex[sortCount - afterCount - 1]	= buffer;
 
-			index[sortIndex[beforeCount + sameCount]]	-= count - afterCount - beforeCount - 2;
-			index[sortIndex[count - afterCount - 1]]	+= count - afterCount - beforeCount - 2;
+			index[sortIndex[beforeCount + sameCount]]		-= sortCount - afterCount - beforeCount - sameCount - 1;
+			index[sortIndex[sortCount - afterCount - 1]]	+= sortCount - afterCount - beforeCount - sameCount - 1;
 
 			afterCount++;
 		}
 		else
-		{
-			for (i = 0; i < afterCount; i++)
-					index[sortIndex[count - i - 1]]--;
 			sameCount++;
-		}
 	}
-
-	for (uint32_t i = 1; i < sameCount; i++)
-		index[sortIndex[beforeCount + i]] = index[sortIndex[beforeCount]];
 
 	if (1 < beforeCount)
 		sameCount += kdo_splitMesh(vertex, index, sortIndex, beforeCount);
 	if (1 < afterCount)
-		sameCount += kdo_splitMesh(vertex, index, sortIndex + beforeCount + sameCount, afterCount);
+		sameCount += kdo_splitMesh(vertex, index, sortIndex + sortCount - afterCount, afterCount);
 
 	return (sameCount - 1);
 }
@@ -502,8 +494,9 @@ void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *inde
 	Kdo_VkBuffer		stagingBuffer;
 	Kdo_VkLoadDataInfo	*vertexInfo;
 	Kdo_VkLoadDataInfo	*indexInfo;
-	uint32_t			*sortIndex;
+	uint32_t			*sortVertexIndex;
 	uint32_t			currentVertex;
+	uint32_t			sameVertex;
 	uint32_t			i;
 	uint32_t			j;
 
@@ -519,27 +512,31 @@ void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *inde
 		if (!(indexInfo[i].data = malloc(indexInfo[i].count * indexInfo[i].elementSize)))
 			kdo_cleanup(vk, ERRLOC, 12);
 
-		if (!(sortIndex				= malloc(info[i].count * sizeof (uint32_t))))
+		if (!(sortVertexIndex				= malloc(info[i].count * sizeof (uint32_t))))
 			kdo_cleanup(vk, ERRLOC, 12);
 		for (j = 0; j < info[i].count; j++)
 		{
 			((uint32_t *) indexInfo[i].data)[j] = j;
-			sortIndex[j]						= j;
+			sortVertexIndex[j]					= j;
 		}
 
-		vertexInfo[i].count			= info[i].count - kdo_splitMesh(info[i].vertex, indexInfo[i].data, sortIndex, info[i].count);
+		vertexInfo[i].count			= info[i].count - kdo_splitMesh(info[i].vertex, indexInfo[i].data, sortVertexIndex, info[i].count);
 		vertexInfo[i].elementSize	= sizeof(Kdo_Vertex);
 		if (!(vertexInfo[i].data = malloc(vertexInfo[i].count * vertexInfo[i].elementSize)))
 			kdo_cleanup(vk, ERRLOC, 12);
 
-		currentVertex = 0;
-		((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[sortIndex[0]];
+		currentVertex	= 0;
+		sameVertex		= 0;
+		((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[sortVertexIndex[0]];
 		for (j = 0; j + 1 < info[i].count; j++)
 		{
-			if (kdo_vertexCmp(info[i].vertex[sortIndex[j]], info[i].vertex[sortIndex[j + 1]]))
-				((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[(sortIndex[j + 1])];
+			if (kdo_vertexCmp(info[i].vertex[sortVertexIndex[j]], info[i].vertex[sortVertexIndex[j + 1]]))
+				((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[sortVertexIndex[j + 1]];
+			else
+				sameVertex++;
+			((uint32_t *) indexInfo[i].data)[sortVertexIndex[j + 1]] -= sameVertex;
 		}
-		free(sortIndex);
+		free(sortVertexIndex);
 	}
 
 	stagingBuffer	= kdo_loadData(vk, infoCount, vertexInfo);

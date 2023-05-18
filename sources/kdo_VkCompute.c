@@ -75,12 +75,12 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	Kdo_VkLoadObjectInfo    info[2];
     Kdo_Vertex              vertex[] = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+	{{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
     {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+	{{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
 	};
 
 	if (0.00185f < currentTime - vk->camera.moveTime)
@@ -91,7 +91,7 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (start)
 	{
-		fastObjMesh* mesh = fast_obj_read("obj/pyramid.obj");
+		fastObjMesh* mesh = fast_obj_read("obj/bugatti.obj");
 
 		Kdo_Vertex *test = malloc(mesh->index_count * sizeof(Kdo_Vertex));
 
@@ -122,17 +122,20 @@ void kdo_compute(Kdo_Vulkan *vk)
 		kdo_loadObject(vk, &vk->core.objects, 2, info);
 		kdo_updateDescripteur(vk, &vk->core.objects);
 		start = 0;
+
+		Kdo_VkObjectDiv *current = kdo_getObject(&vk->core.objects, 1);
+		current->model[current->count - 1].pitch = glm_rad(-90.0f);
+		kdo_updateModel(current->model, 1);
 	}
-
-
 
 	if (1 < currentTime - time)
 	{
 		Kdo_VkObjectDiv	*current = kdo_getObject(&vk->core.objects, 1);
 		kdo_changeObjectCount(vk, &vk->core.objects, 1, current->count + 1);
 	
-		current->model[current->count - 1].pos[2] = current->model[current->count - 2].pos[2] + 1.5f;
+		current->model[current->count - 1].pos[2] = current->model[current->count - 2].pos[2] + 10.0f;
 		current->model[current->count - 1].yaw = current->model[current->count - 2].yaw + 0.2;
+		current->model[current->count - 1].pitch = current->model[current->count - 2].pitch;
 
 		kdo_updateModel(current->model + current->count - 1, 1);
 		time = currentTime;

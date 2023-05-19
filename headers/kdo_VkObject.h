@@ -23,6 +23,7 @@ Kdo_VkBuffer    kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataI
 void			kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *indexBuffer, uint32_t infoCount, Kdo_VkLoadMeshInfo *info);
 void			kdo_loadTextures(Kdo_Vulkan *vk, Kdo_VkImage *textures, uint32_t texturesCount, char **texturesPath);
 void		    kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kdo_VkLoadObjectInfo *info);
+Kdo_Vertex		*kdo_openObj(char *objPath, uint32_t *count);
 void			kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object);
 Kdo_VkObjectDiv *kdo_getObject(Kdo_VkObject *object, uint32_t index);
 void			kdo_changeObjectCount(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t index, uint32_t count);

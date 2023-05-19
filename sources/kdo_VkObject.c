@@ -14,20 +14,23 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
-static float	kdo_vec2Cmp(const vec2 vec1, const vec2 vec2)
+#define FAST_OBJ_IMPLEMENTATION
+#include "objLoader/fast_obj.h"
+
+static float	kdo_vec2Cmp(const vec2 vecteur1, const vec2 vecteur2)
 {
-	if (vec1[0] != vec2[0])
-		return (vec1[0] - vec2[0]);
-	return (vec1[1] - vec2[1]);
+	if (vecteur1[0] != vecteur2[0])
+		return (vecteur1[0] - vecteur2[0]);
+	return (vecteur1[1] - vecteur2[1]);
 }
 
-static float	kdo_vec3Cmp(const vec3 vec1, const vec3 vec2)
+static float	kdo_vec3Cmp(const vec3 vecteur1, const vec3 vecteur2)
 {
-	if (vec1[0] != vec2[0])
-		return (vec1[0] - vec2[0]);
-	if (vec1[1] != vec2[1])
-		return (vec1[1] - vec2[1]);
-	return (vec1[2] - vec2[2]);
+	if (vecteur1[0] != vecteur2[0])
+		return (vecteur1[0] - vecteur2[0]);
+	if (vecteur1[1] != vecteur2[1])
+		return (vecteur1[1] - vecteur2[1]);
+	return (vecteur1[2] - vecteur2[2]);
 }
 
 static float	kdo_vertexCmp(const Kdo_Vertex vertex1, const Kdo_Vertex vertex2)
@@ -36,9 +39,57 @@ static float	kdo_vertexCmp(const Kdo_Vertex vertex1, const Kdo_Vertex vertex2)
 	
 	if ((res = kdo_vec3Cmp(vertex1.pos, vertex2.pos)))
 		return (res);
+	if ((res = kdo_vec3Cmp(vertex1.normal, vertex2.normal)))
+		return (res);
 	if ((res = kdo_vec3Cmp(vertex1.color, vertex2.color)))
 		return (res);
 	return (kdo_vec2Cmp(vertex1.tex, vertex2.tex));
+}
+
+static uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex , uint32_t sortCount)
+{
+	uint32_t	beforeCount	= 0;
+	uint32_t	sameCount	= 1;
+	uint32_t	afterCount	= 0;
+	uint32_t	buffer;
+	float		res;
+
+	while (beforeCount + sameCount + afterCount < sortCount)
+	{
+		res = kdo_vertexCmp(vertex[sortIndex[beforeCount]], vertex[sortIndex[beforeCount + sameCount]]);
+
+		if (res < 0)
+		{
+			buffer								= sortIndex[beforeCount];
+			sortIndex[beforeCount]				= sortIndex[beforeCount + sameCount];
+			sortIndex[beforeCount + sameCount]	= buffer;
+
+			index[sortIndex[beforeCount]]				-= sameCount;
+			index[sortIndex[beforeCount + sameCount]]	+= sameCount;
+
+			beforeCount++;
+		}
+		else if (0 < res)
+		{
+			buffer									= sortIndex[beforeCount + sameCount];
+			sortIndex[beforeCount + sameCount]		= sortIndex[sortCount - afterCount - 1];
+			sortIndex[sortCount - afterCount - 1]	= buffer;
+
+			index[sortIndex[beforeCount + sameCount]]		-= sortCount - afterCount - beforeCount - sameCount - 1;
+			index[sortIndex[sortCount - afterCount - 1]]	+= sortCount - afterCount - beforeCount - sameCount - 1;
+
+			afterCount++;
+		}
+		else
+			sameCount++;
+	}
+
+	if (1 < beforeCount)
+		sameCount += kdo_splitMesh(vertex, index, sortIndex, beforeCount);
+	if (1 < afterCount)
+		sameCount += kdo_splitMesh(vertex, index, sortIndex + sortCount - afterCount, afterCount);
+
+	return (sameCount - 1);
 }
 
 static void	kdo_initTransform(Kdo_VkTransform *transform)
@@ -49,6 +100,16 @@ static void	kdo_initTransform(Kdo_VkTransform *transform)
 	transform->yaw		= 0.0f;
 	transform->pitch	= 0.0f;
 	transform->roll		= 0.0f;
+}
+
+static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *normal)
+{
+	vec3	x;
+	vec3	y;
+
+	glm_vec3_sub(vecteur2, vecteur1, x);
+	glm_vec3_sub(vecteur2, vecteur3, y);
+	glm_vec3_crossn(x, y, *normal);
 }
 
 void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, VkMemoryPropertyFlags memoryFlags)
@@ -443,52 +504,6 @@ Kdo_VkBuffer	kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataInfo
 	return (bufferDst);
 }
 
-uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex , uint32_t sortCount)
-{
-	uint32_t	beforeCount	= 0;
-	uint32_t	sameCount	= 1;
-	uint32_t	afterCount	= 0;
-	uint32_t	buffer;
-	float		res;
-
-	while (beforeCount + sameCount + afterCount < sortCount)
-	{
-		res = kdo_vertexCmp(vertex[sortIndex[beforeCount]], vertex[sortIndex[beforeCount + sameCount]]);
-
-		if (res < 0)
-		{
-			buffer								= sortIndex[beforeCount];
-			sortIndex[beforeCount]				= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]	= buffer;
-
-			index[sortIndex[beforeCount]]				-= sameCount;
-			index[sortIndex[beforeCount + sameCount]]	+= sameCount;
-
-			beforeCount++;
-		}
-		else if (0 < res)
-		{
-			buffer									= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]		= sortIndex[sortCount - afterCount - 1];
-			sortIndex[sortCount - afterCount - 1]	= buffer;
-
-			index[sortIndex[beforeCount + sameCount]]		-= sortCount - afterCount - beforeCount - sameCount - 1;
-			index[sortIndex[sortCount - afterCount - 1]]	+= sortCount - afterCount - beforeCount - sameCount - 1;
-
-			afterCount++;
-		}
-		else
-			sameCount++;
-	}
-
-	if (1 < beforeCount)
-		sameCount += kdo_splitMesh(vertex, index, sortIndex, beforeCount);
-	if (1 < afterCount)
-		sameCount += kdo_splitMesh(vertex, index, sortIndex + sortCount - afterCount, afterCount);
-
-	return (sameCount - 1);
-}
-
 void	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_VkBuffer *vertexBuffer, Kdo_VkBuffer *indexBuffer, uint32_t infoCount, Kdo_VkLoadMeshInfo *info)
 {
 	Kdo_VkBuffer		stagingBuffer;
@@ -654,6 +669,43 @@ void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kd
 	free(texturesPath);
 }
 
+Kdo_Vertex	*kdo_openObj(char *objPath, uint32_t *count)
+{
+	fastObjMesh	*mesh;
+	Kdo_Vertex	*vertex;
+
+	mesh			= fast_obj_read(objPath);
+	if (!(vertex	= malloc(mesh->index_count * sizeof(Kdo_Vertex))))
+		return (NULL);
+	*count			= mesh->index_count;
+
+	for(uint32_t i = 0; i < mesh->index_count; i++)
+	{
+		vertex[i].pos[0]	=	mesh->positions[mesh->indices[i].p * 3];
+		vertex[i].pos[1]	=	mesh->positions[mesh->indices[i].p * 3 + 1];
+		vertex[i].pos[2]	=	mesh->positions[mesh->indices[i].p * 3 + 2] * -1;
+		vertex[i].tex[0]	=	mesh->texcoords[mesh->indices[i].t * 2];
+		vertex[i].tex[1]	=	1.0f - mesh->texcoords[mesh->indices[i].t * 2 + 1];
+		glm_vec3_dup(GLM_VEC3_ONE, vertex[i].color);
+
+		if (1 < mesh->normal_count)
+		{
+			vertex[i].normal[0]	=	mesh->normals[mesh->indices[i].n * 3];
+			vertex[i].normal[1]	=	mesh->normals[mesh->indices[i].n * 3 + 1];
+			vertex[i].normal[2]	=	mesh->normals[mesh->indices[i].n * 3 + 2];
+		}
+		else if (!((i + 1) % 3))
+		{
+			kdo_findNormal(vertex[i].pos, vertex[i - 1].pos, vertex[i - 2].pos, &vertex[i].normal);
+			glm_vec3_dup(vertex[i].normal, vertex[i - 1].normal);
+			glm_vec3_dup(vertex[i].normal, vertex[i - 2].normal);
+		}
+	}
+	fast_obj_destroy(mesh);
+
+	return (vertex);
+}
+
 void	kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object)
 {
 	Kdo_VkObjectDiv			**current;
@@ -724,10 +776,11 @@ void	kdo_updateModel(Kdo_VkTransform *model, uint32_t count)
 {
 	for (uint32_t i = 0; i < count; i++)
 	{
-		glm_scale_make(model[i].path, model[i].scale);
-		glm_translate(model[i].path, model[i].pos);
-		glm_rotate(model[i].path, model[i].yaw, GLM_ZUP);
-		glm_rotate(model[i].path, model[i].pitch, GLM_XUP); 
-		glm_rotate(model[i].path, model[i].roll, GLM_YUP);
+		glm_translate_make(model[i].path, model[i].pos);
+		glm_rotate_make(model[i].normal, model[i].yaw, GLM_ZUP);
+		glm_rotate(model[i].normal, model[i].pitch, GLM_XUP); 
+		glm_rotate(model[i].normal, model[i].roll, GLM_YUP);
+		glm_mat4_mul(model[i].normal, model[i].path, model[i].path);
+		glm_scale(model[i].path, model[i].scale);
 	}
 }

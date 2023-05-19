@@ -46,11 +46,13 @@ typedef enum Kdo_VkObjectStatus
 typedef struct Kdo_VkPush
 {
 	mat4	mvp;
+	mat3	normalMat;
 }	Kdo_VkPush;
 
 typedef struct Kdo_Vertex
 {
     vec3	pos;
+	vec3	normal;
     vec3	color;
 	vec2	tex;
 }	Kdo_Vertex;
@@ -99,6 +101,7 @@ typedef struct Kdo_VkImageProperties
 typedef struct Kdo_VkTransform
 {
 	mat4	path;
+	mat4	normal;
 	vec3	pos;
 	vec3	scale;
 	float	yaw;

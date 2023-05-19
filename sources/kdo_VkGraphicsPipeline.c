@@ -48,7 +48,7 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 {
 	VkDescriptorSetLayoutBinding				descriptorSetBinding;	
 	VkDescriptorSetLayoutCreateInfo				descriptorSetInfo;
-	VkPushConstantRange							constantsRange;
+	VkPushConstantRange							constantsRange[1];
 	VkPipelineLayoutCreateInfo					pipelineLayoutInfo;
 
 	descriptorSetBinding.binding			= 0;
@@ -65,9 +65,9 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 	if (vkCreateDescriptorSetLayout(vk->device.path, &descriptorSetInfo, NULL, &vk->graphicsPipeline.descriptorLayout) != VK_SUCCESS)
 		kdo_cleanup(vk, "Descriptor layout creation failed", 11);
 
-	constantsRange.stageFlags	= VK_SHADER_STAGE_VERTEX_BIT;
-	constantsRange.offset		= 0;
-	constantsRange.size			= sizeof(mat4);
+	constantsRange[0].stageFlags	= VK_SHADER_STAGE_VERTEX_BIT;
+	constantsRange[0].offset		= offsetof(Kdo_VkPush, mvp);
+	constantsRange[0].size			= sizeof(mat4) + sizeof(mat3);
 
 	pipelineLayoutInfo.sType						= VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.pNext						= NULL;
@@ -75,7 +75,7 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 	pipelineLayoutInfo.setLayoutCount				= 1;
 	pipelineLayoutInfo.pSetLayouts					= &vk->graphicsPipeline.descriptorLayout;
 	pipelineLayoutInfo.pushConstantRangeCount		= 1;
-	pipelineLayoutInfo.pPushConstantRanges			= &constantsRange;
+	pipelineLayoutInfo.pPushConstantRanges			= constantsRange;
 	if (vkCreatePipelineLayout(vk->device.path, &pipelineLayoutInfo, NULL, &vk->graphicsPipeline.layout) != VK_SUCCESS)
 		kdo_cleanup(vk, "Pipeline layout creation failed", 13);
 }
@@ -86,7 +86,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	VkPipelineShaderStageCreateInfo				shaderStageInfo[2];
 	VkPipelineVertexInputStateCreateInfo		vertexInputInfo;
 	VkVertexInputBindingDescription				bindingDescription;
-	VkVertexInputAttributeDescription			attributeDescriptions[3];
+	VkVertexInputAttributeDescription			attributeDescriptions[4];
 	VkPipelineInputAssemblyStateCreateInfo		inputAssemblyInfo;
 	VkDynamicState								dynamicStates[]	= {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 	VkPipelineDynamicStateCreateInfo			dynamicStateInfo;
@@ -134,12 +134,17 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	attributeDescriptions[1].location	= 1;
 	attributeDescriptions[1].binding	= 0;
 	attributeDescriptions[1].format		= VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[1].offset		= offsetof(Kdo_Vertex, color);
+	attributeDescriptions[1].offset		= offsetof(Kdo_Vertex, normal);
 
 	attributeDescriptions[2].location	= 2;
 	attributeDescriptions[2].binding	= 0;
-	attributeDescriptions[2].format		= VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[2].offset		= offsetof(Kdo_Vertex, tex);
+	attributeDescriptions[2].format		= VK_FORMAT_R32G32B32_SFLOAT;
+	attributeDescriptions[2].offset		= offsetof(Kdo_Vertex, color);
+
+	attributeDescriptions[3].location	= 3;
+	attributeDescriptions[3].binding	= 0;
+	attributeDescriptions[3].format		= VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[3].offset		= offsetof(Kdo_Vertex, tex);
 
 
 	vertexInputInfo.sType								= VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -147,7 +152,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	vertexInputInfo.flags								= 0;
 	vertexInputInfo.vertexBindingDescriptionCount		= 1;
 	vertexInputInfo.pVertexBindingDescriptions			= &bindingDescription;
-	vertexInputInfo.vertexAttributeDescriptionCount		= 3;
+	vertexInputInfo.vertexAttributeDescriptionCount		= 4;
 	vertexInputInfo.pVertexAttributeDescriptions		= attributeDescriptions;
 
 	inputAssemblyInfo.sType						= VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

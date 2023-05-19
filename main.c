@@ -31,8 +31,8 @@ int	main(int argc, char *argv[])
 	vk.info.validationLayers					= validationLayers;
 	vk.info.deviceExtensionsCount				= 1;
 	vk.info.deviceExtensions					= deviceExtensions;
-	vk.info.windowWidth							= 1000;
-	vk.info.windowHeight						= 1000;
+	vk.info.windowWidth							= 1500;
+	vk.info.windowHeight						= 1500;
 
 	vk.info.queuesInfo[PRESENT_QUEUE].count				= 1;
 	vk.info.queuesInfo[PRESENT_QUEUE].priority			= 1.0f;

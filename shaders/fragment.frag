@@ -10,5 +10,5 @@ layout(location = 2) in vec2 inTexCoord;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-	outColor = vec4(inColor * texture(texSampler, inTexCoord).rgb * max(dot(inNormal, normalize(vec3(1.0, 1.0, 1.0))), 0.01), 1.0);
+	outColor = vec4(inColor * texture(texSampler, inTexCoord).rgb * max(dot(inNormal, vec3(-1.0, 1.0, 1.0)), 0.01), 1.0);
 }

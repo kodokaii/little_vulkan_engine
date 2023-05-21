@@ -96,10 +96,8 @@ static void	kdo_initTransform(Kdo_VkTransform *transform)
 {
 	glm_mat4_identity(transform->path);
 	glm_vec3_zero(transform->pos);
+	glm_vec3_zero(transform->euler);
 	glm_vec3_one(transform->scale);
-	transform->yaw		= 0.0f;
-	transform->pitch	= 0.0f;
-	transform->roll		= 0.0f;
 }
 
 static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *normal)
@@ -107,8 +105,8 @@ static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *no
 	vec3	x;
 	vec3	y;
 
-	glm_vec3_sub(vecteur2, vecteur1, x);
-	glm_vec3_sub(vecteur2, vecteur3, y);
+	glm_vec3_sub(vecteur2, vecteur3, x);
+	glm_vec3_sub(vecteur2, vecteur1, y);
 	glm_vec3_crossn(x, y, *normal);
 }
 
@@ -692,7 +690,8 @@ Kdo_Vertex	*kdo_openObj(char *objPath, uint32_t *count)
 		{
 			vertex[i].normal[0]	=	mesh->normals[mesh->indices[i].n * 3];
 			vertex[i].normal[1]	=	mesh->normals[mesh->indices[i].n * 3 + 1];
-			vertex[i].normal[2]	=	mesh->normals[mesh->indices[i].n * 3 + 2];
+			vertex[i].normal[2]	=	mesh->normals[mesh->indices[i].n * 3 + 2] * -1;
+			glm_vec3_normalize(vertex[i].normal);
 		}
 		else if (!((i + 1) % 3))
 		{
@@ -776,11 +775,8 @@ void	kdo_updateModel(Kdo_VkTransform *model, uint32_t count)
 {
 	for (uint32_t i = 0; i < count; i++)
 	{
-		glm_translate_make(model[i].path, model[i].pos);
-		glm_rotate_make(model[i].normal, model[i].yaw, GLM_ZUP);
-		glm_rotate(model[i].normal, model[i].pitch, GLM_XUP); 
-		glm_rotate(model[i].normal, model[i].roll, GLM_YUP);
-		glm_mat4_mul(model[i].normal, model[i].path, model[i].path);
+		glm_euler(model[i].euler, model[i].normal);
+		glm_translated_to(model[i].normal, model[i].pos, model[i].path);
 		glm_scale(model[i].path, model[i].scale);
 	}
 }

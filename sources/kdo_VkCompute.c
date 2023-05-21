@@ -66,6 +66,7 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 
 void kdo_compute(Kdo_Vulkan *vk)
 {
+	Kdo_VkObjectDiv *current;
 	double			currentTime	= glfwGetTime();
 	static double	time		= 0;
 	static int		start		= 1;
@@ -78,37 +79,43 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (start)
 	{
-		Kdo_VkLoadObjectInfo    info[1];
-		uint32_t	vertexCount;
-		Kdo_Vertex	*objVertex = kdo_openObj("obj/furnace.obj", &vertexCount);
+		Kdo_VkLoadObjectInfo    info[2];
 
 		info[0].name            = "obj";
 		info[0].objectsCount    = 1;
 		info[0].texturePath     = "textures/sky.png";
-		info[0].vertexCount     = vertexCount;
-		info[0].vertex          = objVertex;
+		info[0].vertex          = kdo_openObj("obj/furnace.obj", &info[0].vertexCount);
 		info[0].status          = 0;
 		info[0].sampler         = &vk->core.sampler.basic;
-		kdo_loadObject(vk, &vk->core.objects, 1, info);
+		info[1].name            = "obj";
+		info[1].objectsCount    = 1;
+		info[1].texturePath     = "textures/brick.jpg";
+		info[1].vertex          = kdo_openObj("obj/cube.obj", &info[1].vertexCount);
+		info[1].status          = 0;
+		info[1].sampler         = &vk->core.sampler.basic;
+		kdo_loadObject(vk, &vk->core.objects, 2, info);
 		kdo_updateDescripteur(vk, &vk->core.objects);
 		start = 0;
 
-		Kdo_VkObjectDiv	*current = kdo_getObject(&vk->core.objects, 0);
+		current = kdo_getObject(&vk->core.objects, 0);
+
 		glm_vec3_scale(current->model->scale, 0.001f, current->model->scale);
+		current->model->euler[0] = glm_rad(-90.0f * 0);
+		kdo_updateModel(current->model, 1);
+		current = current->next;
+
+		current->model->pos[2] = 2.0f;
 		kdo_updateModel(current->model, 1);
 	}
 
 	if (0.01 < currentTime - time)
 	{
-		Kdo_VkObjectDiv	*current = kdo_getObject(&vk->core.objects, 0);
-		//kdo_changeObjectCount(vk, &vk->core.objects, 1, current->count + 1);
-	
-		//current->model[current->count - 1].pos[2]	= current->model[current->count - 2].pos[2] + 5.5f;
-		//current->model[current->count - 1].yaw		= current->model[current->count - 2].yaw + 0.8;
-		//glm_vec3_dup(current->model[current->count - 2].scale, current->model[current->count - 1].scale);
-		
-		current->model[0].yaw += glm_rad(0.1f);
+		current = kdo_getObject(&vk->core.objects, 1);
 
+		current->model->euler[0] += 0.011f;
+		current->model->euler[1] += 0.011f;
+		current->model->euler[2] += 0.011f;
+		
 		kdo_updateModel(current->model + current->count - 1, 1);
 		time = currentTime;
 	}

@@ -103,10 +103,8 @@ typedef struct Kdo_VkTransform
 	mat4	path;
 	mat4	normal;
 	vec3	pos;
+	vec3	euler;
 	vec3	scale;
-	float	yaw;
-	float	pitch;
-	float	roll;
 }	Kdo_VkTransform;
 
 typedef	struct Kdo_VkBufferDiv

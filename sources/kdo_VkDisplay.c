@@ -72,9 +72,11 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 
 		for (uint32_t j = 0; j < (*current)->count; j++)
 		{
-			glm_mat4_mul(vk->camera.path, (*current)->model[j].path, push.mvp);
-			glm_mat4_pick3((*current)->model[j].normal, push.normalMat);
-			vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4) + sizeof(mat3), &push);
+			glm_mat4_mul(vk->camera.proj, vk->camera.view, push.mvp);
+			glm_mat4_mul(push.mvp, (*current)->model[j].path, push.mvp);
+			glm_mat4_inv((*current)->model[j].path, push.normalMat);
+			glm_mat4_transpose(push.normalMat);
+			vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkPush), &push);
 			vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, objects->index->div[(*current)->indexIndex].count, 1, 0, 0, 0);
 		}
 

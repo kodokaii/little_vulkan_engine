@@ -46,7 +46,7 @@ typedef enum Kdo_VkObjectStatus
 typedef struct Kdo_VkPush
 {
 	mat4	mvp;
-	mat3	normalMat;
+	mat4	normalMat;
 }	Kdo_VkPush;
 
 typedef struct Kdo_Vertex
@@ -374,7 +374,8 @@ typedef struct Kdo_VkDisplay
 
 typedef struct Kdo_VkCamera
 {
-	mat4	path;
+	mat4	view;
+	mat4	proj;
 	vec3	pos;
 	double	moveTime;
 	double  xMouse;

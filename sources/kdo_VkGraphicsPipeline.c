@@ -26,7 +26,8 @@ static void	kdo_readSpirV(Kdo_Vulkan *vk, const char *fileName, Kdo_Shader *shad
 
 	if (!(shader->code = malloc(shader->codeSize * sizeof(char))))
 		kdo_cleanup(vk, ERRLOC, 12);
-	fread(shader->code, shader->codeSize, 1, file);
+	if (!(fread(shader->code, shader->codeSize, 1, file)))
+		kdo_cleanup(vk, "Error while reading the shader", 32);
 
 	fclose(file);
 }
@@ -66,8 +67,8 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 		kdo_cleanup(vk, "Descriptor layout creation failed", 11);
 
 	constantsRange[0].stageFlags	= VK_SHADER_STAGE_VERTEX_BIT;
-	constantsRange[0].offset		= offsetof(Kdo_VkPush, mvp);
-	constantsRange[0].size			= sizeof(mat4) + sizeof(mat3);
+	constantsRange[0].offset		= 0;
+	constantsRange[0].size			= sizeof(Kdo_VkPush);
 
 	pipelineLayoutInfo.sType						= VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.pNext						= NULL;

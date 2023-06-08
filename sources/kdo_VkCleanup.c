@@ -95,7 +95,7 @@ void	kdo_freeObject(Kdo_VkObject *object)
 	while (*current)
 	{
 		next = &(*current)->next;
-		KDO_FREE((*current)->model);
+		KDO_FREE((*current)->transform);
 		KDO_FREE(*current);
 		current = next;
 	}

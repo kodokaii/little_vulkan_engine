@@ -63,21 +63,20 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 	current = &objects->div;
 	for (uint32_t i = 0; i < objects->divCount; i++)
 	{
-		while ((*current)->status & INVISIBLE)
-			current = &(*current)->next;
-		
 		vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &objects->vertex->buffer, &(objects->vertex->div[(*current)->vertexIndex].offset));
 		vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, objects->index->buffer, objects->index->div[(*current)->indexIndex].offset, VK_INDEX_TYPE_UINT32);
 		vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &(*current)->descripteurSet, 0, NULL);
 
 		for (uint32_t j = 0; j < (*current)->count; j++)
 		{
-			glm_mat4_mul(vk->camera.proj, vk->camera.view, push.mvp);
-			glm_mat4_mul(push.mvp, (*current)->model[j].path, push.mvp);
-			glm_mat4_inv((*current)->model[j].path, push.normalMat);
-			glm_mat4_transpose(push.normalMat);
+			if (!((*current)->transform[j].status & INVISIBLE))
+			{
+				glm_mat4_mul(vk->camera.path, (*current)->transform[j].modelMat, push.mvp);
+				glm_mat4_dup((*current)->transform[j].normalMat, push.normalMat);
+
 			vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkPush), &push);
 			vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, objects->index->div[(*current)->indexIndex].count, 1, 0, 0, 0);
+			}
 		}
 
 		current = &(*current)->next;

@@ -27,6 +27,6 @@ Kdo_Vertex		*kdo_openObj(char *objPath, uint32_t *count);
 void			kdo_updateDescripteur(Kdo_Vulkan *vk, Kdo_VkObject *object);
 Kdo_VkObjectDiv *kdo_getObject(Kdo_VkObject *object, uint32_t index);
 void			kdo_changeObjectCount(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t index, uint32_t count);
-void			kdo_updateModel(Kdo_VkTransform *model, uint32_t count);
+void			kdo_updateTransform(Kdo_VkTransform *transform, uint32_t count);
 
 #endif

@@ -94,10 +94,12 @@ static uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sor
 
 static void	kdo_initTransform(Kdo_VkTransform *transform)
 {
-	glm_mat4_identity(transform->path);
+	glm_mat4_identity(transform->modelMat);
+	glm_mat4_identity(transform->normalMat);
 	glm_vec3_zero(transform->pos);
-	glm_vec3_zero(transform->euler);
+	glm_vec3_zero(transform->rot);
 	glm_vec3_one(transform->scale);
+	transform->status = 0;
 }
 
 static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *normal)
@@ -637,18 +639,17 @@ void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kd
 
 		(*current)->name			= info[i].name;
 		(*current)->count			= info[i].objectsCount;
-		(*current)->status			= info[i].status;
 		(*current)->vertexIndex		= object->vertex->divCount + i;
 		(*current)->indexIndex		= object->index->divCount + i;
 		(*current)->textureIndex	= object->images->divCount + i;
 		(*current)->sampler			= info[i].sampler;
 		(*current)->next			= NULL;
 
-		if (!((*current)->model		= malloc(info[i].objectsCount * sizeof(Kdo_VkTransform))))
+		if (!((*current)->transform		= malloc(info[i].objectsCount * sizeof(Kdo_VkTransform))))
 			kdo_cleanup(vk, ERRLOC, 12);
 
 		for (uint32_t j = 0; j < info[i].objectsCount; j++)
-			kdo_initTransform((*current)->model + j);
+			kdo_initTransform((*current)->transform + j);
 	
 		if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &(*current)->descripteurSet) != VK_SUCCESS)
 			kdo_cleanup(vk, "Descriptor set allocation failed", 35);
@@ -759,24 +760,35 @@ void	kdo_changeObjectCount(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t index,
 
 	if (current->count < count)
 	{
-		memcpy(model, current->model, current->count * sizeof(Kdo_VkTransform));
+		memcpy(model, current->transform, current->count * sizeof(Kdo_VkTransform));
 		for (uint32_t i = current->count; i < count; i++)
 			kdo_initTransform(model + i);
 	}
 	else
-		memcpy(model, current->model, count * sizeof(Kdo_VkTransform));
+		memcpy(model, current->transform, count * sizeof(Kdo_VkTransform));
 	
-	free(current->model);
-	current->model = model;
+	free(current->transform);
+	current->transform = model;
 	current->count = count;
 }
 
-void	kdo_updateModel(Kdo_VkTransform *model, uint32_t count)
+void	kdo_updateTransform(Kdo_VkTransform *transform, uint32_t count)
 {
+	mat4 translateMat;
+	mat4 rotationMat;
+	mat4 scaleMat;
+
 	for (uint32_t i = 0; i < count; i++)
 	{
-		glm_euler(model[i].euler, model[i].normal);
-		glm_translated_to(model[i].normal, model[i].pos, model[i].path);
-		glm_scale(model[i].path, model[i].scale);
+		glm_translate_to(GLM_MAT4_IDENTITY, transform[i].pos, translateMat);
+		glm_euler(transform[i].rot, rotationMat);
+		glm_scale_make(scaleMat, transform[i].scale);
+
+		glm_mat4_mulN((mat4 *[]){&translateMat, &rotationMat, &scaleMat}, 3, transform[i].modelMat);
+
+		scaleMat[0][0] = 1 / scaleMat[0][0];
+		scaleMat[1][1] = 1 / scaleMat[1][1];
+		scaleMat[2][2] = 1 / scaleMat[2][2];
+		glm_mat4_mul(rotationMat, scaleMat, transform[i].normalMat);
 	}
 }

@@ -100,11 +100,12 @@ typedef struct Kdo_VkImageProperties
 
 typedef struct Kdo_VkTransform
 {
-	mat4	path;
-	mat4	normal;
-	vec3	pos;
-	vec3	euler;
-	vec3	scale;
+	mat4					modelMat;
+	mat4					normalMat;
+	vec3					pos;
+	vec3					rot;
+	vec3					scale;
+	Kdo_VkObjectStatus		status;
 }	Kdo_VkTransform;
 
 typedef	struct Kdo_VkBufferDiv
@@ -126,8 +127,7 @@ typedef struct Kdo_VkObjectDiv
 {
 	char					*name;
 	uint32_t				count;
-	Kdo_VkTransform			*model;
-	Kdo_VkObjectStatus		status;
+	Kdo_VkTransform			*transform;
 	uint32_t				vertexIndex;
 	uint32_t				indexIndex;
 	uint32_t				textureIndex;
@@ -374,8 +374,7 @@ typedef struct Kdo_VkDisplay
 
 typedef struct Kdo_VkCamera
 {
-	mat4	view;
-	mat4	proj;
+	mat4	path;
 	vec3	pos;
 	double	moveTime;
 	double  xMouse;

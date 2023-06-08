@@ -19,7 +19,8 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 	VkRenderPassBeginInfo			renderPassInfo;
 	VkClearValue					clearColor[2]	= {};
 	Kdo_VkObjectDiv                 **current;
-	Kdo_VkPush						push;
+	Kdo_VkVertPush					vertPush;
+	Kdo_VkFragPush					fragPush;
 
 	clearColor[0].color.float32[3]		= 1.0f;
 	clearColor[1].depthStencil.depth	= 1.0f;
@@ -60,22 +61,25 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkObject *objects)
 	vkCmdSetScissor(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &scissor);
 	vkCmdBindPipeline(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.path);
 
+	vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &objects->descriptorSet, 0, NULL);
+
 	current = &objects->div;
 	for (uint32_t i = 0; i < objects->divCount; i++)
 	{
 		vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &objects->vertex->buffer, &(objects->vertex->div[(*current)->vertexIndex].offset));
 		vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, objects->index->buffer, objects->index->div[(*current)->indexIndex].offset, VK_INDEX_TYPE_UINT32);
-		vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &(*current)->descripteurSet, 0, NULL);
+		fragPush.objIndex = (*current)->textureIndex;
+				vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(Kdo_VkVertPush), sizeof(Kdo_VkFragPush), &fragPush);
 
-		for (uint32_t j = 0; j < (*current)->count; j++)
+				for (uint32_t j = 0; j < (*current)->count; j++)
 		{
 			if (!((*current)->transform[j].status & INVISIBLE))
 			{
-				glm_mat4_mul(vk->camera.path, (*current)->transform[j].modelMat, push.mvp);
-				glm_mat4_dup((*current)->transform[j].normalMat, push.normalMat);
+				glm_mat4_mul(vk->camera.path, (*current)->transform[j].modelMat, vertPush.mvp);
+				glm_mat4_dup((*current)->transform[j].normalMat, vertPush.normalMat);
+				vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkVertPush), &vertPush);
 
-			vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Kdo_VkPush), &push);
-			vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, objects->index->div[(*current)->indexIndex].count, 1, 0, 0, 0);
+				vkCmdDrawIndexed(vk->display.renderPool[vk->display.currentImage].main, objects->index->div[(*current)->indexIndex].count, 1, 0, 0, 0);
 			}
 		}
 

@@ -146,4 +146,6 @@ void	kdo_recreateSwapchain(Kdo_Vulkan *vk)
 	kdo_initFramebuffers(vk);
 	kdo_initSyncronisation(vk);
 	kdo_initRenderPool(vk);
+
+	vk->display.windowResized = 0;
 }

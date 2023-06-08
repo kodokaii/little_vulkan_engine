@@ -13,6 +13,7 @@
 # define KDO_VKRENDER_H
 
 # include "kdo_Vulkan.h"
+# include "kdo_VkObject.h"
 
 void    kdo_initCore(Kdo_Vulkan *vk);
 

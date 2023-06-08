@@ -26,12 +26,14 @@
 # define SZ_SHADER		2
 
 # define QUEUES_COUNT	3
-# define PRESENT_QUEUE   0
-# define GRAPHIC_QUEUE   1
-# define TRANSFER_QUEUE  2
+# define PRESENT_QUEUE  0
+# define GRAPHIC_QUEUE  1
+# define TRANSFER_QUEUE 2
 
 # define ERRLOC			"CPU Memory allocation error"
 # define FOR_NO_ERROR	-1
+
+# define MAX_MATERIAL	2
 
 typedef enum Kdo_VkWait
 {
@@ -43,11 +45,16 @@ typedef enum Kdo_VkObjectStatus
 	INVISIBLE	= 0x00000001
 }	Kdo_VkObjectStatus;
 
-typedef struct Kdo_VkPush
+typedef struct Kdo_VkVertPush
 {
 	mat4	mvp;
 	mat4	normalMat;
-}	Kdo_VkPush;
+}	Kdo_VkVertPush;
+
+typedef struct Kdo_VkFragPush
+{
+	uint32_t objIndex;
+}	Kdo_VkFragPush;
 
 typedef struct Kdo_Vertex
 {
@@ -131,8 +138,6 @@ typedef struct Kdo_VkObjectDiv
 	uint32_t				vertexIndex;
 	uint32_t				indexIndex;
 	uint32_t				textureIndex;
-	VkSampler				*sampler;
-	VkDescriptorSet			descripteurSet;
 	struct Kdo_VkObjectDiv	*next;
 }	Kdo_VkObjectDiv;
 
@@ -342,6 +347,7 @@ typedef struct Kdo_VkObject
 	Kdo_VkImage		*images;
 	uint32_t		divCount;
 	Kdo_VkObjectDiv	*div;
+	VkDescriptorSet	descriptorSet;
 }	Kdo_VkObject;
 
 typedef struct Kdo_VkCore

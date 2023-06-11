@@ -657,38 +657,73 @@ void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObject *object, uint32_t infoCount, Kd
 	free(texturesPath);
 }
 
-Kdo_Vertex	*kdo_openObj(char *objPath, uint32_t *count)
+Kdo_Vertex	*kdo_openObj(char *objPath, uint32_t *vertexCount)
 {
 	fastObjMesh	*mesh;
 	Kdo_Vertex	*vertex;
+	uint32_t	currentFace;
+	uint32_t	currentFaceVertex;
+	uint32_t	currentVertex;
+	uint32_t	vertexOffset;
 
+	*vertexCount	= 0;
 	mesh			= fast_obj_read(objPath);
-	if (!(vertex	= malloc(mesh->index_count * sizeof(Kdo_Vertex))))
+	for (currentFace = 0; currentFace < mesh->face_count; currentFace++)
+		*vertexCount += (mesh->face_vertices[currentFace] - 2);
+	*vertexCount *= 3;
+	if (!(vertex	= malloc(*vertexCount * sizeof(Kdo_Vertex))))
 		return (NULL);
-	*count			= mesh->index_count;
 
-	for(uint32_t i = 0; i < mesh->index_count; i++)
+	currentFaceVertex	= 0;
+	currentVertex		= 0;
+	for(currentFace = 0; currentFace < mesh->face_count; currentFace++)
 	{
-		vertex[i].pos[0]	=	mesh->positions[mesh->indices[i].p * 3];
-		vertex[i].pos[1]	=	mesh->positions[mesh->indices[i].p * 3 + 1];
-		vertex[i].pos[2]	=	mesh->positions[mesh->indices[i].p * 3 + 2] * -1;
-		vertex[i].tex[0]	=	mesh->texcoords[mesh->indices[i].t * 2];
-		vertex[i].tex[1]	=	1.0f - mesh->texcoords[mesh->indices[i].t * 2 + 1];
-		glm_vec3_dup(GLM_VEC3_ONE, vertex[i].color);
+		for (vertexOffset = 0; 3 <= mesh->face_vertices[currentFace] - vertexOffset; vertexOffset++)
+		{
+			vertex[currentVertex + vertexOffset * 3].pos[0]		=	mesh->positions[mesh->indices[currentFaceVertex].p * 3];
+			vertex[currentVertex + vertexOffset * 3].pos[1]		=	mesh->positions[mesh->indices[currentFaceVertex].p * 3 + 1];
+			vertex[currentVertex + vertexOffset * 3].pos[2]		=	mesh->positions[mesh->indices[currentFaceVertex].p * 3 + 2] * -1;
+			vertex[currentVertex + vertexOffset * 3].tex[0]		=	mesh->texcoords[mesh->indices[currentFaceVertex].t * 2];
+			vertex[currentVertex + vertexOffset * 3].tex[1]		=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex].t * 2 + 1];
+			glm_vec3_dup(GLM_VEC3_ONE, vertex[currentVertex + vertexOffset * 3].color);
 
-		if (1 < mesh->normal_count)
-		{
-			vertex[i].normal[0]	=	mesh->normals[mesh->indices[i].n * 3];
-			vertex[i].normal[1]	=	mesh->normals[mesh->indices[i].n * 3 + 1];
-			vertex[i].normal[2]	=	mesh->normals[mesh->indices[i].n * 3 + 2] * -1;
-			glm_vec3_normalize(vertex[i].normal);
+			vertex[currentVertex + vertexOffset * 3 + 1].pos[0]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3];
+			vertex[currentVertex + vertexOffset * 3 + 1].pos[1]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3 + 1];
+			vertex[currentVertex + vertexOffset * 3 + 1].pos[2]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3 + 2] * -1;
+			vertex[currentVertex + vertexOffset * 3 + 1].tex[0]	=	mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 1].t * 2];
+			vertex[currentVertex + vertexOffset * 3 + 1].tex[1]	=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 1].t * 2 + 1];
+			glm_vec3_dup(GLM_VEC3_ONE, vertex[currentVertex + vertexOffset * 3 + 1].color);
+
+			vertex[currentVertex + vertexOffset * 3 + 2].pos[0]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3];
+			vertex[currentVertex + vertexOffset * 3 + 2].pos[1]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3 + 1];
+			vertex[currentVertex + vertexOffset * 3 + 2].pos[2]	=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3 + 2] * -1;
+			vertex[currentVertex + vertexOffset * 3 + 2].tex[0]	=	mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 2].t * 2];
+			vertex[currentVertex + vertexOffset * 3 + 2].tex[1]	=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 2].t * 2 + 1];
+			glm_vec3_dup(GLM_VEC3_ONE, vertex[currentVertex + vertexOffset * 3 + 2].color);
+
+			if (1 < mesh->normal_count)
+			{
+				vertex[currentVertex + vertexOffset * 3].normal[0]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3];
+				vertex[currentVertex + vertexOffset * 3].normal[1]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3 + 1];
+				vertex[currentVertex + vertexOffset * 3].normal[2]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3 + 2] * -1;
+
+				vertex[currentVertex + vertexOffset * 3 + 1].normal[0]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3];
+				vertex[currentVertex + vertexOffset * 3 + 1].normal[1]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3 + 1];
+				vertex[currentVertex + vertexOffset * 3 + 1].normal[2]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3 + 2] * -1;
+
+				vertex[currentVertex + vertexOffset * 3 + 2].normal[0]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3];
+				vertex[currentVertex + vertexOffset * 3 + 2].normal[1]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3 + 1];
+				vertex[currentVertex + vertexOffset * 3 + 2].normal[2]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3 + 2] * -1;
+			}
+			else
+			{
+				kdo_findNormal(vertex[currentVertex + vertexOffset * 3].pos, vertex[currentVertex + vertexOffset * 3 + 2].pos, vertex[currentVertex + vertexOffset * 3 + 1].pos, &vertex[currentVertex + vertexOffset * 3].normal);
+				glm_vec3_dup(vertex[currentVertex + vertexOffset * 3].normal, vertex[currentVertex + vertexOffset * 3 + 1].normal);
+				glm_vec3_dup(vertex[currentVertex + vertexOffset * 3].normal, vertex[currentVertex + vertexOffset * 3 + 2].normal);
+			}
 		}
-		else if (!((i + 1) % 3))
-		{
-			kdo_findNormal(vertex[i].pos, vertex[i - 1].pos, vertex[i - 2].pos, &vertex[i].normal);
-			glm_vec3_dup(vertex[i].normal, vertex[i - 1].normal);
-			glm_vec3_dup(vertex[i].normal, vertex[i - 2].normal);
-		}
+		currentVertex += 3 * vertexOffset;
+		currentFaceVertex += 2 + vertexOffset;
 	}
 	fast_obj_destroy(mesh);
 

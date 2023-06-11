@@ -18,6 +18,6 @@ layout( push_constant ) uniform constants
 void main()
 { 
     gl_Position		= push.mvp * vec4(inPos, 1.0);
-    outColor		= inColor * max(dot(normalize(mat3(push.normalMat) * inNormal), normalize(vec3(1.0, -3.0, -1.0))), 0.0);
+	outColor		= inColor * max(dot(normalize(mat3(push.normalMat) * inNormal), normalize(vec3(1.0, 1.0, -1.0))), 0.0);
 	outTexCoord		= inTexCoord;
 }

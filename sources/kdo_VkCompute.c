@@ -90,8 +90,8 @@ void kdo_compute(Kdo_Vulkan *vk)
 		info[0].sampler         = &vk->core.sampler.basic;
 		info[1].name            = "obj";
 		info[1].objectsCount    = 1;
-		info[1].texturePath     = "textures/viking_room.png";
-		info[1].vertex          = kdo_openObj("obj/sphere.obj", &info[1].vertexCount);
+		info[1].texturePath     = "textures/sky.png";
+		info[1].vertex          = kdo_openObj("obj/bugatti.obj", &info[1].vertexCount);
 		info[1].status          = 0;
 		info[1].sampler         = &vk->core.sampler.basic;
 		kdo_loadObject(vk, &vk->core.objects, 2, info);
@@ -101,11 +101,11 @@ void kdo_compute(Kdo_Vulkan *vk)
 		current = kdo_getObject(&vk->core.objects, 0);
 
 		glm_vec3_scale(current->transform->scale, 0.1f, current->transform->scale);
-		current->transform->rot[0] = glm_rad(-90.0f * 0);
+		current->transform->rot[0] = glm_rad(-90.0f);
 		kdo_updateTransform(current->transform, 1);
 		current = current->next;
 
-		current->transform->pos[2] = 4;
+		current->transform->pos[2] = 5;
 		kdo_updateTransform(current->transform, 1);
 
 	}

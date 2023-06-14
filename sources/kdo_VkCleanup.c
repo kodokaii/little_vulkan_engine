@@ -86,26 +86,6 @@ void	kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image)
 	image->divCount					= 0;
 }
 
-void	kdo_freeObject(Kdo_VkObject *object)
-{
-	Kdo_VkObjectDiv	**current;	
-	Kdo_VkObjectDiv	**next;
-
-	current = &object->div;
-	while (*current)
-	{
-		next = &(*current)->next;
-		KDO_FREE((*current)->transform);
-		KDO_FREE(*current);
-		current = next;
-	}
-	object->vertex		= NULL;
-	object->index		= NULL;
-	object->images		= NULL;
-	object->divCount	= 0;
-	object->div			= NULL;
-}
-
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 {
 	printf("%s\nReturn Code: %d\n", msg, returnCode);
@@ -115,8 +95,7 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 
 	kdo_freeBuffer(vk, &vk->core.vertex);
 	kdo_freeBuffer(vk, &vk->core.index);
-	kdo_freeImage(vk, &vk->core.images);
-	kdo_freeObject(&vk->core.objects);
+	kdo_freeImage(vk, &vk->core.textures);
 
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->core.descriptorPool)
 	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->core.sampler.basic)

@@ -17,8 +17,6 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 	float	sensitivity	= glm_rad(0.15f);
 	double	yCurrentMousse;
 	double	xCurrentMousse;
-	mat4	view;
-	mat4	proj;
 	vec3	watch;
 	vec3	right;
 	vec3	front;
@@ -56,10 +54,8 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 	if ((glfwGetKey(vk->window.path, GLFW_KEY_LEFT_CONTROL)) == GLFW_PRESS)
 		glm_vec3_sub(vk->camera.pos, top, vk->camera.pos);
 	
-	glm_look(vk->camera.pos, watch, GLM_ZUP, view);
-	glm_perspective(glm_rad(60.0f), vk->swapChain.imagesExtent.width / vk->swapChain.imagesExtent.height, 0.1f, 50.0f, proj);
-
-	glm_mat4_mul(proj, view, vk->camera.path);
+	glm_look(vk->camera.pos, watch, GLM_ZUP, vk->camera.view);
+	glm_perspective(glm_rad(60.0f), vk->swapChain.imagesExtent.width / vk->swapChain.imagesExtent.height, 0.1f, 50.0f, vk->camera.proj);
 
 	vk->camera.xMouse = xCurrentMousse;
 	vk->camera.yMouse = yCurrentMousse;

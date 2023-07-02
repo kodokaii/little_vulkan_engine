@@ -95,6 +95,11 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 
 	kdo_freeBuffer(vk, &vk->core.vertex);
 	kdo_freeBuffer(vk, &vk->core.index);
+	kdo_freeBuffer(vk, &vk->core.materials);
+	kdo_freeBuffer(vk, &vk->core.materialMap);
+	kdo_freeBuffer(vk, &vk->core.objectMap);
+	kdo_freeBuffer(vk, &vk->core.light);
+	kdo_freeBuffer(vk, &vk->core.drawCommand);
 	kdo_freeImage(vk, &vk->core.textures);
 
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->core.descriptorPool)

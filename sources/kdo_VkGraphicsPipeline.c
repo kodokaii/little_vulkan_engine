@@ -47,46 +47,79 @@ static void kdo_createShaderModule(Kdo_Vulkan *vk, Kdo_Shader *shader)
 
 static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 {
-	VkDescriptorSetLayoutBinding				descriptorSetBinding[2];	
+	VkDescriptorSetLayoutBinding				descriptorSetBinding[6];
+	VkDescriptorBindingFlags                    bindingFlags[6];
+	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
 	VkDescriptorSetLayoutCreateInfo				descriptorSetInfo;
-	VkPushConstantRange							constantsRange[2];
+	VkPushConstantRange							constantsRange;
 	VkPipelineLayoutCreateInfo					pipelineLayoutInfo;
 
 	descriptorSetBinding[0].binding				= 0;
-	descriptorSetBinding[0].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorSetBinding[0].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorSetBinding[0].descriptorCount		= 1;
-	descriptorSetBinding[0].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[0].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[0].pImmutableSamplers	= NULL;
+	bindingFlags[0]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
 	descriptorSetBinding[1].binding				= 1;
-	descriptorSetBinding[1].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorSetBinding[1].descriptorCount		= MAX_MATERIAL;
-	descriptorSetBinding[1].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[1].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[1].descriptorCount		= 1;
+	descriptorSetBinding[1].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[1].pImmutableSamplers	= NULL;
+	bindingFlags[1]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+	descriptorSetBinding[2].binding				= 2;
+	descriptorSetBinding[2].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorSetBinding[2].descriptorCount		= 1;
+	descriptorSetBinding[2].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[2].pImmutableSamplers	= NULL;
+	bindingFlags[2]                             = 0;
+
+	descriptorSetBinding[3].binding				= 3;
+	descriptorSetBinding[3].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descriptorSetBinding[3].descriptorCount		= 1;
+	descriptorSetBinding[3].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[3].pImmutableSamplers	= NULL;
+	bindingFlags[3]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+	descriptorSetBinding[4].binding				= 4;
+	descriptorSetBinding[4].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[4].descriptorCount		= 1;
+	descriptorSetBinding[4].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	bindingFlags[4]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+	descriptorSetBinding[5].binding				= 5;
+	descriptorSetBinding[5].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[5].descriptorCount		= 1;
+	descriptorSetBinding[5].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[5].pImmutableSamplers	= NULL;
+	bindingFlags[5]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+
+	bindingFlagsInfo.sType          = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+	bindingFlagsInfo.pNext          = NULL;
+    bindingFlagsInfo.bindingCount   = 6;
+    bindingFlagsInfo.pBindingFlags  = bindingFlags;
 
 	descriptorSetInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descriptorSetInfo.pNext			= NULL;
+	descriptorSetInfo.pNext			= &bindingFlagsInfo;
 	descriptorSetInfo.flags			= 0;
-	descriptorSetInfo.bindingCount	= 2;
+	descriptorSetInfo.bindingCount	= 6;
 	descriptorSetInfo.pBindings		= descriptorSetBinding;
 	if (vkCreateDescriptorSetLayout(vk->device.path, &descriptorSetInfo, NULL, &vk->graphicsPipeline.descriptorLayout) != VK_SUCCESS)
 		kdo_cleanup(vk, "Descriptor layout creation failed", 11);
 
-	constantsRange[0].stageFlags	= VK_SHADER_STAGE_VERTEX_BIT;
-	constantsRange[0].offset		= 0;
-	constantsRange[0].size			= sizeof(Kdo_VkVertPush);
-
-	constantsRange[1].stageFlags	= VK_SHADER_STAGE_FRAGMENT_BIT;
-	constantsRange[1].offset		= sizeof(Kdo_VkVertPush);
-	constantsRange[1].size			= sizeof(Kdo_VkFragPush);
+	constantsRange.stageFlags	= VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	constantsRange.offset		= 0;
+	constantsRange.size			= sizeof(Kdo_VkPush);
 
 	pipelineLayoutInfo.sType						= VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.pNext						= NULL;
 	pipelineLayoutInfo.flags						= 0;
 	pipelineLayoutInfo.setLayoutCount				= 1;
 	pipelineLayoutInfo.pSetLayouts					= &vk->graphicsPipeline.descriptorLayout;
-	pipelineLayoutInfo.pushConstantRangeCount		= 2;
-	pipelineLayoutInfo.pPushConstantRanges			= constantsRange;
+	pipelineLayoutInfo.pushConstantRangeCount		= 1;
+	pipelineLayoutInfo.pPushConstantRanges			= &constantsRange;
 	if (vkCreatePipelineLayout(vk->device.path, &pipelineLayoutInfo, NULL, &vk->graphicsPipeline.layout) != VK_SUCCESS)
 		kdo_cleanup(vk, "Pipeline layout creation failed", 13);
 }
@@ -149,14 +182,13 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 
 	attributeDescriptions[2].location	= 2;
 	attributeDescriptions[2].binding	= 0;
-	attributeDescriptions[2].format		= VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset		= offsetof(Kdo_Vertex, color);
+	attributeDescriptions[2].format		= VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[2].offset		= offsetof(Kdo_Vertex, tex);
 
 	attributeDescriptions[3].location	= 3;
 	attributeDescriptions[3].binding	= 0;
-	attributeDescriptions[3].format		= VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[3].offset		= offsetof(Kdo_Vertex, tex);
-
+	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[3].offset		= offsetof(Kdo_Vertex, relMaterialIndex);
 
 	vertexInputInfo.sType								= VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.pNext								= NULL;

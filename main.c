@@ -12,24 +12,24 @@
 #include "kdo_VkGlfw.h"
 #include "kdo_VkInit.h"
 #include "kdo_VkDisplay.h"
-#include "kdo_VkObject.h"
 
 int	main(int argc, char *argv[])
 {
 	Kdo_Vulkan		vk						= {};
+	const char		*instanceExtensions[]	= {VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME};
 	const char		*validationLayers[]		= {"VK_LAYER_KHRONOS_validation"};
-	const char		*deviceExtensions[]		= {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	const char		*deviceExtensions[]		= {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, VK_KHR_MAINTENANCE_3_EXTENSION_NAME};
 
 	(void) argc;
 	(void) argv;
 
 	vk.info.applicationName						= "Vulkan Project";
 	vk.info.engineName							= "Kodo Engine";
-	vk.info.instanceExtensionsCount				= 0;
-	vk.info.instanceExtensions					= NULL;
+	vk.info.instanceExtensionsCount				= 1;
+	vk.info.instanceExtensions					= instanceExtensions;
 	vk.info.validationLayersCount				= 1;
 	vk.info.validationLayers					= validationLayers;
-	vk.info.deviceExtensionsCount				= 1;
+	vk.info.deviceExtensionsCount				= 3;
 	vk.info.deviceExtensions					= deviceExtensions;
 	vk.info.windowWidth							= 1500;
 	vk.info.windowHeight						= 1500;

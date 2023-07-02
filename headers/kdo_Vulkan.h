@@ -33,7 +33,13 @@
 # define ERRLOC			"CPU Memory allocation error"
 # define FOR_NO_ERROR	-1
 
-# define MAX_MATERIAL	2
+#define MAX_LIGHT           8
+#define MAX_OBJECT          32
+#define MAX_TEXTURES        64
+#define MAX_MATERIAL        128
+#define MAX_MATERIAL_MAP    256
+
+# define DEFAULT_TEXTURE	"textures/default.png"
 
 typedef enum Kdo_VkWait
 {
@@ -45,53 +51,52 @@ typedef enum Kdo_VkStatus
 	INVISIBLE	= 0x00000001
 }	Kdo_VkStatus;
 
-typedef struct Kdo_VkMaterial
+typedef struct Kdo_ShMaterial
 {
-    char		*name;
-    float		Ka[3];
-    float		Kd[3];
-    float		Ks[3];
-    float		Ke[3];
-    float		Kt[3];
-    float		Ns;
-    float		Ni;
-    float		Tf[3];
-    float		d;
-    int			illum;
+	vec4        Ka;
+    vec4        Kd;
+    vec4        Ks;
+    vec4        Ke;
+    vec4        Kt;
+    vec4        Tf;
+    float       Ns;
+    float       Ni;
+    float       d;
+    int         illum;
 
-	uint32_t	texture;
-}	Kdo_VkMaterial;
+    uint        map_Kd;
+    uint        map_Ns;
+    uint        map_Bump;
+}	Kdo_ShMaterial;
 
-typedef struct Kdo_VkVertPush
+typedef struct Kdo_ShObjectMap
 {
-	mat4	proj;
-	mat4	view;
-}	Kdo_VkVertPush;
+	mat4 modelMat;
+    mat4 normalMat;
+    uint materialOffset;
+    uint pad0;
+    uint pad1;
+    uint pad2;
+}	Kdo_ShObjectMap;
 
-typedef struct Kdo_VkModelMat
+typedef struct Kdo_ShLight
 {
-	mat4 model;
-	mat4 normal;
-}	Kdo_VkModelMat;
+	vec4	pos_intensity;
+	vec4	color_stop;
+}	Kdo_ShLight;
 
-typedef struct Kdo_VkMaterialMap
+typedef struct Kdo_VkPush
 {
-	uint32_t	vertexIndex;
-	uint32_t	materialIndex;
-}	Kdo_VkMaterialMap;
-
-typedef struct Kdo_VkObjectMap
-{
-	Kdo_VkModelMat		mat;
-	Kdo_VkMaterialMap	materialMap[];
-}	Kdo_VkObjectMap;
+	mat4	camera;
+	vec4	cameraPos;
+}	Kdo_VkPush;
 
 typedef struct Kdo_Vertex
 {
-    vec3	pos;
-	vec3	normal;
-    vec3	color;
-	vec2	tex;
+    vec3		pos;
+	vec3		normal;
+	vec2		tex;
+	uint32_t	relMaterialIndex;
 }	Kdo_Vertex;
 
 typedef struct Kdo_Shader
@@ -137,7 +142,8 @@ typedef struct Kdo_VkImageProperties
 
 typedef struct Kdo_VkTransform
 {
-	Kdo_VkModelMat			mat;
+	mat4					modelMat;
+	mat4					normalMat;
 	vec3					pos;
 	vec3					rot;
 	vec3					scale;
@@ -164,8 +170,7 @@ typedef struct Kdo_VkObjectDiv
 	char				*name;
 	Kdo_VkTransform		transform;
 	uint32_t			meshIndex;
-	uint32_t			materialCount;
-	Kdo_VkMaterialMap	*materialMap;
+	uint32_t			materialOffset;
 }	Kdo_VkObjectDiv;
 
 typedef struct Kdo_VkQueueInfo
@@ -322,15 +327,16 @@ typedef struct Kdo_VkCore
 {
 	VkCommandPool		transferPool;
 	VkDescriptorPool	descriptorPool;
-	VkDescriptorSet		texturesSet;
-	VkDescriptorSet		objectSet;
+	VkDescriptorSet		descriptorSet;
 	Kdo_VkBuffer		vertex;
 	Kdo_VkBuffer		index;
-	Kdo_VkBuffer		materials;
-	Kdo_VkBuffer		drawCommand;
 	Kdo_VkBuffer		objectMap;
+	Kdo_VkBuffer		materialMap;
+	Kdo_VkBuffer		materials;
+	Kdo_VkBuffer		light;
 	Kdo_VkImage			textures;
 	Kdo_VkSampler		sampler;
+	Kdo_VkBuffer		drawCommand;
 	Kdo_VkObject		objects;
 }	Kdo_VkCore;
 
@@ -353,8 +359,7 @@ typedef struct Kdo_VkDisplay
 
 typedef struct Kdo_VkCamera
 {
-	mat4	proj;
-	mat4	view;
+	mat4	path;
 	vec3	pos;
 	double	moveTime;
 	double  xMouse;

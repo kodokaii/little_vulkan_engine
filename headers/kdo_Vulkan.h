@@ -35,7 +35,7 @@
 
 #define MAX_LIGHT           8
 #define MAX_OBJECT          32
-#define MAX_TEXTURES        64
+#define MAX_TEXTURES        128
 #define MAX_MATERIAL        128
 #define MAX_MATERIAL_MAP    256
 
@@ -127,58 +127,8 @@ typedef struct Kdo_SynImage
 	VkFence				*renderFinishedFence;
 }	Kdo_SynImage;
 
-typedef struct Kdo_VkBufferProperties
-{
-	VkBufferUsageFlags	usage;
-	Kdo_VkWait			waitFlags;
-}	Kdo_VkBufferProperties;
-
-typedef struct Kdo_VkImageProperties
-{
-	uint32_t		memoryFilter;
-	VkImageLayout	layout;
-	Kdo_VkWait		waitFlags;
-}	Kdo_VkImageProperties;
-
-typedef struct Kdo_VkTransform
-{
-	mat4					modelMat;
-	mat4					normalMat;
-	vec3					pos;
-	vec3					rot;
-	vec3					scale;
-	Kdo_VkStatus			status;
-}	Kdo_VkTransform;
-
-typedef	struct Kdo_VkBufferDiv
-{
-	VkDeviceSize			offset;
-	VkDeviceSize			elementSize;
-	uint32_t				count;
-}	Kdo_VkBufferDiv;
-
-typedef struct Kdo_VkImageDiv
-{
-	VkExtent3D				extent;
-	VkDeviceSize			size;
-	VkImage					image;
-	VkImageView				view;
-}	Kdo_VkImageDiv;
-
-typedef struct Kdo_VkObjectDiv
-{
-	char				*name;
-	Kdo_VkTransform		transform;
-	uint32_t			meshIndex;
-	uint32_t			materialOffset;
-}	Kdo_VkObjectDiv;
-
 typedef struct Kdo_VkQueueInfo
-{
-	uint32_t		count;
-	float			priority;
-	VkQueueFlags	requiredFlags;
-	VkQueueFlags	noRequiredFlags;
+{ uint32_t		count; float			priority; VkQueueFlags	requiredFlags; VkQueueFlags	noRequiredFlags;
 	VkQueueFlags	preferredFlags;
 	VkQueueFlags	noPreferredFlags;
 	VkBool32		presentSupport;
@@ -240,10 +190,7 @@ typedef struct Kdo_VkPhysicalDevice
 	VkPhysicalDevice					path;
 	VkPhysicalDeviceProperties			properties;
 	VkPhysicalDeviceFeatures			features;
-	Kdo_VkSwapChainProperties			swapChainProperties;
-	Kdo_VkQueueProperties				queueProperties;
-	VkPhysicalDeviceMemoryProperties	memProperties;
-}	Kdo_VkPhysicalDevice;
+	Kdo_VkSwapChainProperties			swapChainProperties; Kdo_VkQueueProperties				queueProperties; VkPhysicalDeviceMemoryProperties	memProperties; }	Kdo_VkPhysicalDevice;
 
 typedef struct Kdo_VkDevice
 {
@@ -293,35 +240,51 @@ typedef struct Kdo_VkFence
 	VkFence	*renderFinished;
 }	Kdo_VkFence;
 
+typedef struct Kdo_VkBufferProperties
+{
+	VkBufferUsageFlags		usage;
+	VkMemoryPropertyFlags	memoryFlags;
+	Kdo_VkWait				waitFlags;
+}	Kdo_VkBufferProperties;
+
 typedef struct Kdo_VkBuffer
 {
 	Kdo_VkBufferProperties	properties;
 	VkBuffer				buffer;
-	VkDeviceSize			size;
 	VkDeviceMemory			memory;
-	uint32_t				divCount;
-	Kdo_VkBufferDiv			*div;
+	VkDeviceSize			sizeUsed;
+	VkDeviceSize			sizeFree;
 }	Kdo_VkBuffer;
 
-typedef	struct Kdo_VkImage
+typedef struct Kdo_VkImageProperties
+{
+	uint32_t		memoryFilter;
+	VkImageLayout	layout;
+	Kdo_VkWait		waitFlags;
+}	Kdo_VkImageProperties;
+
+typedef struct Kdo_VkImage
+{
+	VkExtent3D				extent;
+	VkDeviceSize			size;
+	VkImage					image;
+	VkImageView				view;
+}	Kdo_VkImage;
+
+typedef	struct Kdo_VkImageBuffer
 {
 	Kdo_VkImageProperties	properties;
-	VkDeviceSize			size;
 	VkDeviceMemory			memory;
-	uint32_t				divCount;
-	Kdo_VkImageDiv			*div;
-}	Kdo_VkImage;
+	VkDeviceSize			sizeUsed;
+	VkDeviceSize			sizeFree;
+	uint32_t				imageCount;
+	Kdo_VkImage				*image;
+}	Kdo_VkImageBuffer;
 
 typedef struct Kdo_VkSampler
 {
 	VkSampler	basic;
 }	Kdo_VkSampler;
-
-typedef struct Kdo_VkObject
-{
-	uint32_t		divCount;
-	Kdo_VkObjectDiv	*div;
-}	Kdo_VkObject;
 
 typedef struct Kdo_VkCore
 {
@@ -334,10 +297,9 @@ typedef struct Kdo_VkCore
 	Kdo_VkBuffer		materialMap;
 	Kdo_VkBuffer		materials;
 	Kdo_VkBuffer		light;
-	Kdo_VkImage			textures;
+	Kdo_VkImageBuffer	textures;
 	Kdo_VkSampler		sampler;
 	Kdo_VkBuffer		drawCommand;
-	Kdo_VkObject		objects;
 }	Kdo_VkCore;
 
 typedef struct Kdo_VkRenderPool

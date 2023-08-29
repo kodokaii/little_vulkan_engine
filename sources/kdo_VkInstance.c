@@ -38,7 +38,7 @@ void    kdo_initInstance(Kdo_Vulkan *vk)
 	appInfo.sType                   = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pNext                   = NULL;
     appInfo.pApplicationName        = vk->info.applicationName;
-    appInfo.applicationVersion      = VK_MAKE_VERSION(1, 3, 0);
+    appInfo.applicationVersion      = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName             = vk->info.engineName;
     appInfo.engineVersion           = VK_MAKE_VERSION(2, 0, 0);
     appInfo.apiVersion              = VK_API_VERSION_1_0;	

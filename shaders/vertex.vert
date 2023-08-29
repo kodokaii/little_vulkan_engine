@@ -2,7 +2,6 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define MAX_OBJECT			32
-#define MAX_TEXTURES		64
 #define MAX_MATERIAL_MAP	256
 
 struct ObjectMap
@@ -47,6 +46,6 @@ void main()
 	outPos				= vec3(objectBuffer.object[gl_InstanceIndex].modelMat * vec4(inPos, 1.0));
 	outNormal			= normalize(mat3(objectBuffer.object[gl_InstanceIndex].normalMat) * inNormal);
 	outTexCoord			= inTexCoord;
-
-	outMaterialIndex	= inRelMaterialIndex;
+	//outMaterialIndex	= materialMapBuffer.absMaterialIndex[objectBuffer.object[gl_InstanceIndex].materialOffset + inRelMaterialIndex];
+	outMaterialIndex = inRelMaterialIndex;
 }

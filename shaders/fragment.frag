@@ -2,6 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define MAX_LIGHT           8
+#define MAX_TEXTURE			128
 #define MAX_MATERIAL        128
 
 struct Light
@@ -35,7 +36,7 @@ layout(location = 3) flat in uint	inMaterialIndex;
 layout(location = 0) out vec4 outColor;
 
 layout(binding = 2) uniform sampler samp;
-layout(binding = 3) uniform texture2D textures[4];
+layout(binding = 3) uniform texture2D textures[MAX_TEXTURE];
 layout(binding = 4) uniform LightBuffer
 {
     Light       light[MAX_LIGHT];

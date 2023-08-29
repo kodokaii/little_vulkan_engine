@@ -8,7 +8,6 @@
 /* ###    ### ########  #########   ########  ###    ### ###     ### ###########       */
 /*                        <kodokai.featheur@gmail.com>                                 */
 /* *********************************************************************************** */
-
 #include "kdo_VkFunction.h"
 
 int	kdo_checkExtensions(const char **find, uint32_t findCount, const char *list, uint32_t listCount, size_t offsetList)
@@ -148,13 +147,24 @@ uint32_t	findTextureMemoryFiltrer(Kdo_Vulkan *vk)
 	return (memRequirements.memoryTypeBits);
 }
 
-void	*kdo_mallocMerge(size_t sizeSrc1, void *src1, size_t sizeSrc2, void *src2)
+void	*kdo_reallocMerge(size_t sizeDst, void *dst, size_t sizeSrc, void *src)
 {
-	void	*dst;
-
-	dst = malloc(sizeSrc1 + sizeSrc2);
-	memcpy(dst, src1, sizeSrc1); 
-	memcpy(dst + sizeSrc1, src2, sizeSrc2);
+	dst = realloc(dst, sizeDst + sizeSrc);
+	memcpy(dst + sizeDst, src, sizeSrc);
 
 	return (dst);
+}
+
+VkDeviceSize	kdo_minSize(VkDeviceSize val1, VkDeviceSize val2)
+{
+	if (val1 <= val2)
+		return (val1);
+	return (val2);
+}
+
+VkDeviceSize	kdo_maxSize(VkDeviceSize val1, VkDeviceSize val2)
+{
+	if (val1 <= val2)
+		return (val2);
+	return (val1);
 }

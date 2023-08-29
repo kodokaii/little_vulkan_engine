@@ -258,9 +258,10 @@ typedef struct Kdo_VkBuffer
 
 typedef struct Kdo_VkImageProperties
 {
-	uint32_t		memoryFilter;
-	VkImageLayout	layout;
-	Kdo_VkWait		waitFlags;
+	VkImageLayout			layout;
+	VkMemoryPropertyFlags	memoryFlags;
+	uint32_t				memoryFilter;
+	Kdo_VkWait				waitFlags;
 }	Kdo_VkImageProperties;
 
 typedef struct Kdo_VkImage

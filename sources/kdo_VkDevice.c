@@ -114,18 +114,12 @@ void    kdo_initDevice(Kdo_Vulkan *vk)
 	VkDeviceCreateInfo							deviceInfo;
 	VkDeviceQueueCreateInfo						*queueCreateInfo;
 	VkPhysicalDeviceFeatures					deviceFeatures					= {};
-	VkPhysicalDeviceDescriptorIndexingFeatures	descriptorIndexingFeatures	= {};
 	float										queuePriority[QUEUES_COUNT];
 
 	deviceFeatures.samplerAnisotropy	= VK_TRUE;
 
-	descriptorIndexingFeatures.sType										= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-	descriptorIndexingFeatures.pNext										= NULL;
-	descriptorIndexingFeatures.descriptorBindingPartiallyBound				= VK_TRUE;
-	descriptorIndexingFeatures.runtimeDescriptorArray						= VK_TRUE;
-
 	deviceInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	deviceInfo.pNext					= &descriptorIndexingFeatures;
+	deviceInfo.pNext					= NULL;
 	deviceInfo.flags					= 0;
 	deviceInfo.queueCreateInfoCount		= kdo_createQueueInfo(vk, &queueCreateInfo, queuePriority); 
 	deviceInfo.pQueueCreateInfos		= queueCreateInfo;

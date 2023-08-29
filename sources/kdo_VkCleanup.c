@@ -60,36 +60,34 @@ void    kdo_freeBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 
     KDO_DESTROY(vkDestroyBuffer, vk->device.path, buffer->buffer)
     KDO_DESTROY(vkFreeMemory, vk->device.path, buffer->memory)
-	KDO_FREE(buffer->div)
 	buffer->properties.usage		= 0;
 	buffer->properties.waitFlags	= 0;
-	buffer->size					= 0;
-	buffer->divCount				= 0;
+	buffer->sizeUsed				= 0;
+	buffer->sizeFree				= 0;
 }
 
-void	kdo_freeImage(Kdo_Vulkan *vk, Kdo_VkImage *image)
+void	kdo_freeImageBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer)
 {
-	if (image->properties.waitFlags & WAIT_DEVICE)
+	if (imageBuffer->properties.waitFlags & WAIT_DEVICE)
         vkDeviceWaitIdle(vk->device.path);
 
-	for (uint32_t i = 0; i < image->divCount; i++)
+	for (uint32_t i = 0; i < imageBuffer->imageCount; i++)
 	{
-		KDO_DESTROY(vkDestroyImage, vk->device.path, image->div[i].image)
-		KDO_DESTROY(vkDestroyImageView, vk->device.path, image->div[i].view)
+		KDO_DESTROY(vkDestroyImage, vk->device.path, imageBuffer->image[i].image)
+		KDO_DESTROY(vkDestroyImageView, vk->device.path, imageBuffer->image[i].view)
 	}
-	KDO_DESTROY(vkFreeMemory, vk->device.path, image->memory)
-	KDO_FREE(image->div)
-	image->properties.memoryFilter	= 0;
-	image->properties.layout		= 0;
-	image->properties.waitFlags		= 0;
-	image->size						= 0;
-	image->divCount					= 0;
+	KDO_DESTROY(vkFreeMemory, vk->device.path, imageBuffer->memory)
+	KDO_FREE(imageBuffer->image)
+	imageBuffer->properties.memoryFilter	= 0;
+	imageBuffer->properties.layout			= 0;
+	imageBuffer->properties.waitFlags		= 0;
+	imageBuffer->sizeUsed					= 0;
+	imageBuffer->sizeFree					= 0;
+	imageBuffer->imageCount					= 0;
 }
 
 void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 {
-	printf("%s\nReturn Code: %d\n", msg, returnCode);
-
 	if (vk->device.path)
 		vkDeviceWaitIdle(vk->device.path);
 
@@ -129,6 +127,8 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 	KDO_FREE(vk->info.instanceExtensions)
 
 	glfwTerminate();
+
+	printf("%s\nReturn Code: %d\n", msg, returnCode);
 
 	exit(returnCode);
 }

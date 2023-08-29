@@ -80,7 +80,6 @@ void kdo_compute(Kdo_Vulkan *vk)
 	if (start)
 	{
 		VkDrawIndexedIndirectCommand	drawCommand;
-		Kdo_ShObjectMap					objectMap;
 		Kdo_ShLight						light = {{5.0f, 0.0f, -10.0f, 10.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
 		Kdo_VkLoadDataInfo				loadInfo;
 		Kdo_VkObjectInfo				objectInfo = kdo_openObj(vk, "obj/bugatti.obj");
@@ -97,30 +96,17 @@ void kdo_compute(Kdo_Vulkan *vk)
 		drawCommand.vertexOffset	= 0;
 		drawCommand.firstInstance	= 0;
 
-		 glm_mat4_identity(objectMap.modelMat);
-		 glm_mat4_identity(objectMap.normalMat);
-		 glm_rotate_make(objectMap.modelMat, glm_rad(-90.0f), GLM_XUP);
-		 glm_rotate_make(objectMap.normalMat, glm_rad(-90.0f), GLM_XUP);
-		objectMap.materialOffset	= 0;
-
 		loadInfo.elementSize		= sizeof(VkDrawIndexedIndirectCommand);
 		loadInfo.count				= 1;
 		loadInfo.data				= &drawCommand;
 		stagingBuffer			= kdo_loadData(vk, 1, &loadInfo);
 		vk->core.drawCommand	= kdo_catBuffer(vk, &vk->core.drawCommand, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		loadInfo.elementSize		= sizeof(Kdo_ShObjectMap);
-		loadInfo.count				= 1;
-		loadInfo.data				= &objectMap;
-		stagingBuffer		= kdo_loadData(vk, 1, &loadInfo);
-		vk->core.objectMap	= kdo_catBuffer(vk, &vk->core.objectMap, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
 		loadInfo.elementSize		= sizeof(Kdo_ShLight);
 		loadInfo.count				= 1;
 		loadInfo.data				= &light;
 		stagingBuffer		= kdo_loadData(vk, 1, &loadInfo);
 		vk->core.light		= kdo_catBuffer(vk, &vk->core.light, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
 
 		writeBufferInfo[0].buffer	= vk->core.objectMap.buffer;
 		writeBufferInfo[0].offset	= 0;

@@ -372,8 +372,10 @@ void	kdo_loadTextures(Kdo_Vulkan *vk, uint32_t texturesCount, char **texturesPat
 void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info)
 {
 	Kdo_VkObjectDiv		*objectDiv;
+	Kdo_ShObjectMap     *objectMap;
 	uint32_t			*materialMap;
 	Kdo_VkLoadMeshInfo	*loadMeshInfo;
+	Kdo_VkLoadDataInfo	*loadObjectMapInfo;
 	Kdo_VkLoadDataInfo	*loadMaterialInfo;
 	Kdo_VkLoadDataInfo	*loadMaterialMapInfo;
 	Kdo_VkBuffer		stagingBuffer;
@@ -388,6 +390,10 @@ void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info
 
 	if (!(objectDiv				= malloc(objectCount * sizeof(Kdo_VkObjectDiv))))
 		kdo_cleanup(vk, ERRLOC, 12);
+	if (!(objectMap				= malloc(objectCount * sizeof(Kdo_ShObjectMap))))
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (!(loadObjectMapInfo		= malloc(objectCount * sizeof(Kdo_VkLoadMeshInfo))))
+		kdo_cleanup(vk, ERRLOC, 12);
 	if (!(loadMeshInfo			= malloc(objectCount * sizeof(Kdo_VkLoadMeshInfo))))
 		kdo_cleanup(vk, ERRLOC, 12);
 	if (!(loadMaterialInfo		= malloc(materialCount * sizeof(Kdo_VkLoadDataInfo))))
@@ -398,11 +404,10 @@ void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info
 		kdo_cleanup(vk, ERRLOC, 12);
 
 	materialOffset = 0;
+	if (0 < vk->core.objects.divCount)
+		materialOffset = vk->core.objects.div[vk->core.objects.divCount - 1].materialOffset;
 	for (currentObject = 0; currentObject < objectCount; currentObject++)
 	{
-		loadMeshInfo[currentObject].count	= info[currentObject].vertexCount;
-		loadMeshInfo[currentObject].vertex	= info[currentObject].vertex;	
-
 		for (currentMaterial = 0; currentMaterial < info[currentObject].materialCount; currentMaterial++)
 		{
 			loadMaterialInfo[materialOffset + currentMaterial].elementSize	= sizeof(Kdo_ShMaterial);
@@ -411,9 +416,23 @@ void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info
 			materialMap[materialOffset + currentMaterial]	= vk->core.materialMap.divCount + materialOffset + currentMaterial;
 		}
 
+		loadMeshInfo[currentObject].count	= info[currentObject].vertexCount;
+		loadMeshInfo[currentObject].vertex	= info[currentObject].vertex;	
+
+		
 		loadMaterialMapInfo[currentObject].elementSize	= sizeof(uint32_t);
 		loadMaterialMapInfo[currentObject].count		= info[currentObject].materialCount;
 		loadMaterialMapInfo[currentObject].data			= materialMap + materialOffset; 
+
+		glm_mat4_identity(objectMap[currentObject].modelMat);
+		glm_mat4_identity(objectMap[currentObject].normalMat);
+		glm_rotate_make(objectMap[currentObject].modelMat, glm_rad(-90.0f), GLM_XUP);
+		glm_rotate_make(objectMap[currentObject].normalMat, glm_rad(-90.0f), GLM_XUP);
+		objectMap[currentObject].materialOffset    = materialOffset;
+
+		loadObjectMapInfo[currentObject].elementSize        = sizeof(Kdo_ShObjectMap);
+		loadObjectMapInfo[currentObject].count              = 1;
+        loadObjectMapInfo[currentObject].data               = objectMap + currentObject;
 
 		objectDiv[currentObject].name				= info[currentObject].name;
 		objectDiv[currentObject].meshIndex			= vk->core.index.divCount + currentObject;
@@ -421,9 +440,11 @@ void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info
 		kdo_initTransform(&objectDiv[currentObject].transform);
 
 		materialOffset += info[currentObject].materialCount;
-
 	}
 	kdo_loadMesh(vk, objectCount, loadMeshInfo);
+
+	stagingBuffer       = kdo_loadData(vk, objectCount, loadObjectMapInfo);
+	vk->core.objectMap  = kdo_catBuffer(vk, &vk->core.objectMap, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	stagingBuffer = kdo_loadData(vk, materialCount, loadMaterialInfo);
 	vk->core.materials = kdo_catBuffer(vk, &vk->core.materials, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -440,6 +461,8 @@ void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info
 		free(info[currentObject].material);
 	}
 	free(objectDiv);
+	free(objectMap);
+	free(loadObjectMapInfo);
 	free(loadMeshInfo);
 	free(loadMaterialInfo);
 	free(loadMaterialMapInfo);

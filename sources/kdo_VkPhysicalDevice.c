@@ -28,7 +28,7 @@ void	kdo_getSwapChainProperties(Kdo_Vulkan *vk)
 
 void	kdo_getQueueProperties(Kdo_Vulkan *vk)
 {
-		vkGetPhysicalDeviceQueueFamilyProperties(vk->physicalDevice.path, &vk->physicalDevice.queueProperties.famillesCount, NULL);
+	vkGetPhysicalDeviceQueueFamilyProperties(vk->physicalDevice.path, &vk->physicalDevice.queueProperties.famillesCount, NULL);
 	if (!(vk->physicalDevice.queueProperties.path = malloc(vk->physicalDevice.queueProperties.famillesCount * sizeof(VkQueueFamilyProperties))))
 		kdo_cleanup(vk, ERRLOC, 12);
 	vkGetPhysicalDeviceQueueFamilyProperties(vk->physicalDevice.path, &vk->physicalDevice.queueProperties.famillesCount, vk->physicalDevice.queueProperties.path);

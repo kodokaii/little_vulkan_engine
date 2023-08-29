@@ -11,7 +11,10 @@
 
 #include "kdo_VkMemory.h"
 
-void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, VkMemoryPropertyFlags memoryFlags)
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
+static void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 {
 	VkBufferCreateInfo		bufferInfo;
 	VkMemoryRequirements	memRequirements;
@@ -20,7 +23,7 @@ void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, VkMemoryPropertyFlags
 	bufferInfo.sType					= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.pNext					= NULL;
 	bufferInfo.flags					= 0;
-	bufferInfo.size						= buffer->size;
+	bufferInfo.size						= buffer->sizeUsed + buffer->sizeFree;
 	bufferInfo.usage					= buffer->properties.usage;
 	bufferInfo.sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
 	bufferInfo.queueFamilyIndexCount	= 0;
@@ -33,402 +36,312 @@ void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, VkMemoryPropertyFlags
 	allocInfo.sType             = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.pNext             = NULL;
 	allocInfo.allocationSize    = memRequirements.size;
-	allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, memRequirements.memoryTypeBits, memoryFlags);
+	allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, memRequirements.memoryTypeBits, buffer->properties.memoryFlags);
 	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &buffer->memory) != VK_SUCCESS)
 		kdo_cleanup(vk, "Allocation buffer memory failed", 25);
 	vkBindBufferMemory(vk->device.path, buffer->buffer, buffer->memory, 0);
 }
 
-void	kdo_allocImage(Kdo_Vulkan *vk, Kdo_VkImage *image, VkMemoryPropertyFlags memoryFlags, Kdo_VkImageInfoFunc func)
+static void	kdo_cpyBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferDst, Kdo_VkBuffer *bufferSrc, VkDeviceSize dstOffset, VkDeviceSize srcOffset, VkDeviceSize size)
 {
-	VkImageCreateInfo		imageInfo;
-	VkImageViewCreateInfo	viewInfo;
-	VkMemoryRequirements	memRequirements;
-	VkMemoryAllocateInfo	allocInfo;
-	VkDeviceSize			offset;
-	uint32_t				i;
+	VkCommandBuffer			copy;
+	VkBufferCopy			copyInfo;
 
-	image->size	= 0;
-	for(i = 0; i < image->divCount; i++)
+	if (size)
 	{
-		(*func.imageInfo)(image->div[i].extent, &imageInfo);
-		vkCreateImage(vk->device.path, &imageInfo, NULL, &image->div[i].image);
-
-		vkGetImageMemoryRequirements(vk->device.path, image->div[i].image, &memRequirements);
-		image->div[i].size	= memRequirements.size;
-		image->size			+= memRequirements.size;
+		kdo_beginUniqueCommand(vk, &copy);
+		copyInfo.srcOffset	= srcOffset;
+		copyInfo.dstOffset	= dstOffset;
+		copyInfo.size		= size;
+		vkCmdCopyBuffer(copy, bufferSrc->buffer, bufferDst->buffer, 1, &copyInfo);
+		kdo_endUniqueCommand(vk, &copy);
 	}
+}
+
+static void	kdo_writeHostBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize, VkDeviceSize offset)
+{
+	void			*mapMemory;
+
+	vkMapMemory(vk->device.path, buffer->memory, offset, dataSize, 0, &mapMemory);
+	memcpy(mapMemory, data, dataSize);
+	vkUnmapMemory(vk->device.path, buffer->memory);
+}
+
+static void	kdo_readHostBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize, VkDeviceSize offset)
+{
+	void			*mapMemory;
+
+	vkMapMemory(vk->device.path, buffer->memory, offset, dataSize, 0, &mapMemory);
+	memcpy(data, mapMemory, dataSize);
+	vkUnmapMemory(vk->device.path, buffer->memory);
+}
+
+Kdo_VkBuffer	kdo_newBuffer(Kdo_Vulkan *vk, VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags)
+{
+	Kdo_VkBuffer	buffer;
+
+	buffer.properties.usage			= usage;
+	buffer.properties.memoryFlags	= memoryFlags;
+	buffer.properties.waitFlags		= waitFlags;
+	buffer.sizeUsed					= 0;
+	buffer.sizeFree					= bufferSize;
+	if (bufferSize)
+		kdo_allocBuffer(vk, &buffer);
+
+	return (buffer);
+}
+
+void	kdo_reallocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, VkDeviceSize newSize)
+{
+	Kdo_VkBuffer			bufferDst = {};
+
+	if (newSize == bufferSrc->sizeUsed + bufferSrc->sizeFree)
+		return ;
+	
+	bufferDst.properties.usage			= bufferSrc->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bufferDst.properties.memoryFlags	= bufferSrc->properties.memoryFlags;
+	bufferDst.properties.waitFlags		= bufferSrc->properties.waitFlags;
+	bufferDst.sizeUsed					= kdo_minSize(bufferSrc->sizeUsed, newSize);
+	bufferDst.sizeFree					= newSize - bufferDst.sizeUsed; 
+	kdo_allocBuffer(vk, &bufferDst);
+
+	kdo_cpyBuffer(vk, &bufferDst, bufferSrc, 0, 0, bufferDst.sizeUsed); 
+	
+	kdo_freeBuffer(vk, bufferSrc);
+	*bufferSrc = bufferDst;
+}
+
+void	kdo_setData(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize, VkDeviceSize offset)
+{
+	Kdo_VkBuffer	stagingBuffer;
+	VkDeviceSize	bufferSize;
+
+	if (dataSize == 0)
+		return ;
+	if (dataSize < 0 || buffer->sizeUsed < offset)
+		kdo_cleanup(vk, "Write GPU Buffer Error", 26);
+
+	bufferSize = kdo_maxSize(buffer->sizeUsed + buffer->sizeFree, offset + dataSize);
+	kdo_reallocBuffer(vk, buffer, bufferSize);
+	if (buffer->properties.memoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+				kdo_writeHostBuffer(vk, buffer, data, dataSize, offset);
+	else
+	{
+		stagingBuffer = kdo_newBuffer(vk, dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0);  
+		kdo_writeHostBuffer(vk, &stagingBuffer, data, dataSize, 0);
+		kdo_cpyBuffer(vk, buffer, &stagingBuffer, offset, 0, dataSize);
+		kdo_freeBuffer(vk, &stagingBuffer);
+	}
+	buffer->sizeUsed = kdo_maxSize(buffer->sizeUsed, offset + dataSize);	
+	buffer->sizeFree = bufferSize - buffer->sizeUsed;
+}
+
+void	kdo_getData(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize, VkDeviceSize offset)
+{
+	Kdo_VkBuffer	stagingBuffer;
+
+	if (dataSize == 0)
+		return ;
+	if (dataSize < 0 || (buffer->sizeUsed + buffer->sizeFree) < (offset + dataSize))
+		kdo_cleanup(vk, "Read GPU Buffer Error", 27);
+
+	if (buffer->properties.memoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+				kdo_readHostBuffer(vk, buffer, data, dataSize, offset);
+	else
+	{
+		stagingBuffer = kdo_newBuffer(vk, dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0);  
+		kdo_cpyBuffer(vk, &stagingBuffer, buffer, 0, offset, dataSize);
+		kdo_readHostBuffer(vk, &stagingBuffer, data, dataSize, offset);
+		kdo_freeBuffer(vk, &stagingBuffer);
+	}
+}
+
+
+static void	kdo_allocImageBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer)
+{
+	VkMemoryAllocateInfo	allocInfo;
 
 	allocInfo.sType             = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.pNext             = NULL;
-	allocInfo.allocationSize    = image->size;
-	allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, image->properties.memoryFilter, memoryFlags);
-	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &image->memory) != VK_SUCCESS)
-		kdo_cleanup(vk, "Allocation image memory failed", 26);
-
-	offset	= 0;
-	for (i = 0; i < image->divCount; i++)
-	{
-		vkBindImageMemory(vk->device.path, image->div[i].image, image->memory, offset);
-
-		(*func.viewInfo)(image->div[i].image, &viewInfo);
-		vkCreateImageView(vk->device.path, &viewInfo, NULL, &image->div[i].view);
-
-		offset += image->div[i].size;
-	}
+	allocInfo.allocationSize    = imageBuffer->sizeUsed + imageBuffer->sizeFree;
+	allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, imageBuffer->properties.memoryFilter, imageBuffer->properties.memoryFlags);
+	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &imageBuffer->memory) != VK_SUCCESS)
+		kdo_cleanup(vk, "Allocation image memory failed", 28);
 }
 
-Kdo_VkBuffer	kdo_copyBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, VkMemoryPropertyFlags memoryFlags)
+static void	kdo_appendNewImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer, VkExtent3D extent, Kdo_VkImageFuncInfo funcInfo)
 {
-	Kdo_VkBuffer			bufferDst = {};
-	VkCommandBuffer			copy;
-	VkBufferCopy			copyInfo;
+	Kdo_VkImage				newImage;
+	VkImageCreateInfo		imageInfo;
+	VkImageViewCreateInfo   viewInfo;
+	VkMemoryRequirements    memRequirements;
 
-	bufferDst.properties.usage		= bufferSrc->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	bufferDst.properties.waitFlags	= bufferSrc->properties.waitFlags;
-	bufferDst.size					= bufferSrc->size;
-	bufferDst.divCount				= bufferSrc->divCount;
-	if (!(bufferDst.div				= malloc(bufferSrc->divCount * sizeof(Kdo_VkBufferDiv))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	memcpy(bufferDst.div, bufferSrc->div, bufferSrc->divCount * sizeof(Kdo_VkBufferDiv));
+	(*funcInfo.imageInfo)(extent, &imageInfo);
+	vkCreateImage(vk->device.path, &imageInfo, NULL, &newImage.image);
+	
+	(*funcInfo.viewInfo)(newImage.image, &viewInfo);
+	vkCreateImageView(vk->device.path, &viewInfo, NULL, &newImage.view);
 
-	kdo_allocBuffer(vk, &bufferDst, memoryFlags);
+	vkGetImageMemoryRequirements(vk->device.path, newImage.image, &memRequirements);
+	newImage.extent = extent;
+	newImage.size = memRequirements.size;
 
-	kdo_beginUniqueCommand(vk, &copy);
-	copyInfo.srcOffset	= 0;
-
-	if (bufferSrc->size)
-	{
-		copyInfo.dstOffset	= 0;
-		copyInfo.size		= bufferSrc->size;
-		vkCmdCopyBuffer(copy, bufferSrc->buffer, bufferDst.buffer, 1, &copyInfo);
-	}
-	kdo_endUniqueCommand(vk, &copy);
-
-	return (bufferDst);
+	kdo_reallocMerge(imageBuffer->imageCount * sizeof(Kdo_VkImage), imageBuffer->image, sizeof(Kdo_VkImage), &newImage);
 }
 
-Kdo_VkBuffer	kdo_catBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc1, Kdo_VkBuffer *bufferSrc2, VkMemoryPropertyFlags memoryFlags)
+static void	kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
+		VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, \
+		VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, \
+		VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-	Kdo_VkBuffer			bufferDst = {};
-	VkCommandBuffer			copy;
-	VkBufferCopy			copyInfo;
+	VkImageMemoryBarrier	imageBarrierInfo;
 
-	bufferDst.properties.usage		= bufferSrc1->properties.usage | bufferSrc2->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	bufferDst.properties.waitFlags	= bufferSrc1->properties.waitFlags | bufferSrc2->properties.waitFlags;
-	bufferDst.size					= bufferSrc1->size + bufferSrc2->size;
-	bufferDst.divCount				= bufferSrc1->divCount + bufferSrc2->divCount;
-	if (!(bufferDst.div				= kdo_mallocMerge(bufferSrc1->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc1->div, bufferSrc2->divCount * sizeof(Kdo_VkBufferDiv), bufferSrc2->div)))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	for (uint32_t i = bufferSrc1->divCount; i < bufferDst.divCount; i++)
-		bufferDst.div[i].offset += bufferSrc1->size;
-
-	kdo_allocBuffer(vk, &bufferDst, memoryFlags);
-
-	kdo_beginUniqueCommand(vk, &copy);
-	copyInfo.srcOffset	= 0;
-
-	if (bufferSrc1->size)
-	{
-		copyInfo.dstOffset	= 0;
-		copyInfo.size		= bufferSrc1->size;
-		vkCmdCopyBuffer(copy, bufferSrc1->buffer, bufferDst.buffer, 1, &copyInfo);
-	}
-
-	if (bufferSrc2->size)
-	{
-		copyInfo.srcOffset	= 0;
-		copyInfo.dstOffset	= bufferSrc1->size;
-		copyInfo.size		= bufferSrc2->size;
-		vkCmdCopyBuffer(copy, bufferSrc2->buffer, bufferDst.buffer, 1, &copyInfo);
-	}
-	kdo_endUniqueCommand(vk, &copy);
-	kdo_freeBuffer(vk, bufferSrc1);
-	kdo_freeBuffer(vk, bufferSrc2);
-
-	return (bufferDst);
+	imageBarrierInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageBarrierInfo.pNext                           = NULL;
+	imageBarrierInfo.srcAccessMask                   = srcAccessMask;
+	imageBarrierInfo.dstAccessMask                   = dstAccessMask;
+	imageBarrierInfo.oldLayout                       = oldLayout;
+	imageBarrierInfo.newLayout                       = newLayout;
+	imageBarrierInfo.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+	imageBarrierInfo.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+	imageBarrierInfo.image                           = image;
+	imageBarrierInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageBarrierInfo.subresourceRange.baseMipLevel   = 0;
+	imageBarrierInfo.subresourceRange.levelCount     = 1;
+	imageBarrierInfo.subresourceRange.baseArrayLayer = 0;
+	imageBarrierInfo.subresourceRange.layerCount     = 1;
+	vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, NULL, 0, NULL, 1, &imageBarrierInfo);
 }
 
-Kdo_VkImage	kdo_catImage(Kdo_Vulkan *vk, Kdo_VkImage *imageSrc1, Kdo_VkImage *imageSrc2, Kdo_VkCatImageInfo info)
+Kdo_VkImageBuffer	kdo_newImageBuffer(Kdo_Vulkan *vk, VkDeviceSize bufferSize, VkImageLayout layout, VkMemoryPropertyFlags memoryFlags, uint32_t memoryFilter, Kdo_VkWait waitFlags)
 {
-	Kdo_VkImage				imageDst;
-	VkCommandBuffer			copy;
-	VkImageMemoryBarrier	*imageBarrierInfo;
-	VkImageCopy				copyInfo;
-	uint32_t				i;
-	uint32_t				j;
+	Kdo_VkImageBuffer		imageBuffer;
 
-	imageDst.properties.memoryFilter	= imageSrc1->properties.memoryFilter & imageSrc2->properties.memoryFilter;
-	imageDst.properties.layout			= info.layout;
-	imageDst.properties.waitFlags		= imageSrc1->properties.waitFlags | imageSrc2->properties.waitFlags;
-	imageDst.divCount		= imageSrc1->divCount + imageSrc2->divCount;
-	if (!(imageDst.div		= kdo_mallocMerge(imageSrc1->divCount * sizeof(Kdo_VkImageDiv), imageSrc1->div, imageSrc2->divCount * sizeof(Kdo_VkImageDiv), imageSrc2->div)))
-		kdo_cleanup(vk, ERRLOC, 12);
+	imageBuffer.properties.layout		= layout;
+	imageBuffer.properties.memoryFlags	= memoryFlags;
+	imageBuffer.properties.memoryFilter	= memoryFilter;
+	imageBuffer.properties.waitFlags	= waitFlags;
+	imageBuffer.sizeUsed				= 0;
+	imageBuffer.sizeFree				= bufferSize;
+	imageBuffer.memory					= 0;
+	imageBuffer.imageCount				= 0;
+	imageBuffer.image					= NULL;
+	if (bufferSize)
+		kdo_allocImageBuffer(vk, &imageBuffer);
 
-	kdo_allocImage(vk, &imageDst, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, info.func);
-	if (!(imageBarrierInfo	= malloc(2 * imageDst.divCount * sizeof(VkImageMemoryBarrier))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	kdo_beginUniqueCommand(vk, &copy);
-
-	for (i = 0; i < imageDst.divCount; i++)
-	{
-		imageBarrierInfo[i].sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrierInfo[i].pNext                           = NULL;
-        imageBarrierInfo[i].srcAccessMask                   = 0;
-        imageBarrierInfo[i].dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageBarrierInfo[i].newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        imageBarrierInfo[i].srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].image                           = imageDst.div[i].image;
-        imageBarrierInfo[i].subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrierInfo[i].subresourceRange.baseMipLevel   = 0;
-        imageBarrierInfo[i].subresourceRange.levelCount     = 1;
-        imageBarrierInfo[i].subresourceRange.baseArrayLayer = 0;
-        imageBarrierInfo[i].subresourceRange.layerCount     = 1;
-	}
-	for (j = 0; j < imageSrc1->divCount; j++)
-	{
-		imageBarrierInfo[i].sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrierInfo[i].pNext                           = NULL;
-        imageBarrierInfo[i].srcAccessMask                   = 0;
-        imageBarrierInfo[i].dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].oldLayout                       = imageSrc1->properties.layout;
-        imageBarrierInfo[i].newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        imageBarrierInfo[i].srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].image                           = imageSrc1->div[j].image;
-        imageBarrierInfo[i].subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrierInfo[i].subresourceRange.baseMipLevel   = 0;
-        imageBarrierInfo[i].subresourceRange.levelCount     = 1;
-        imageBarrierInfo[i].subresourceRange.baseArrayLayer = 0;
-        imageBarrierInfo[i].subresourceRange.layerCount     = 1;
-
-		i++;
-	}
-	for (j = 0; j < imageSrc2->divCount; j++)
-	{
-		imageBarrierInfo[i].sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrierInfo[i].pNext                           = NULL;
-        imageBarrierInfo[i].srcAccessMask                   = 0;
-        imageBarrierInfo[i].dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].oldLayout                       = imageSrc2->properties.layout;
-        imageBarrierInfo[i].newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        imageBarrierInfo[i].srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].image                           = imageSrc2->div[j].image;
-        imageBarrierInfo[i].subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrierInfo[i].subresourceRange.baseMipLevel   = 0;
-        imageBarrierInfo[i].subresourceRange.levelCount     = 1;
-        imageBarrierInfo[i].subresourceRange.baseArrayLayer = 0;
-        imageBarrierInfo[i].subresourceRange.layerCount     = 1;
-		i++;
-	}
-	vkCmdPipelineBarrier(copy, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2 * imageDst.divCount, imageBarrierInfo);
-
-	copyInfo.srcSubresource.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT;
-	copyInfo.srcSubresource.mipLevel		= 0;
-	copyInfo.srcSubresource.baseArrayLayer	= 0;
-	copyInfo.srcSubresource.layerCount		= 1;
-	copyInfo.srcOffset.x					= 0;
-	copyInfo.srcOffset.y					= 0;
-	copyInfo.srcOffset.z					= 0;
-	copyInfo.dstSubresource.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT;
-	copyInfo.dstSubresource.mipLevel		= 0;
-	copyInfo.dstSubresource.baseArrayLayer	= 0;
-	copyInfo.dstSubresource.layerCount		= 1;
-	copyInfo.dstOffset.x					= 0;
-	copyInfo.dstOffset.y					= 0;
-	copyInfo.dstOffset.z					= 0;
-
-	for (i = 0; i < imageSrc1->divCount; i++)
-    {
-		copyInfo.extent	= imageSrc1->div[i].extent;
-		vkCmdCopyImage(copy, imageSrc1->div[i].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageDst.div[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
-
-		imageBarrierInfo[i].srcAccessMask   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].dstAccessMask   = VK_ACCESS_SHADER_READ_BIT;
-        imageBarrierInfo[i].oldLayout       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageBarrierInfo[i].newLayout       = imageDst.properties.layout;
-
-	}
-	for (j = 0; j < imageSrc2->divCount; j++)
-    {
-		copyInfo.extent	= imageSrc2->div[j].extent;
-		vkCmdCopyImage(copy, imageSrc2->div[j].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageDst.div[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
-
-		imageBarrierInfo[i].srcAccessMask   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].dstAccessMask   = VK_ACCESS_SHADER_READ_BIT;
-        imageBarrierInfo[i].oldLayout       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageBarrierInfo[i].newLayout       = imageDst.properties.layout;
-		i++;
-	}
-	vkCmdPipelineBarrier(copy, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, imageDst.divCount, imageBarrierInfo);
-
-	kdo_endUniqueCommand(vk, &copy);
-	free(imageBarrierInfo);
-	kdo_freeImage(vk, imageSrc1);
-	kdo_freeImage(vk, imageSrc2);
-
-	return (imageDst);
+	return (imageBuffer);
 }
 
-Kdo_VkImage	kdo_catBufferToImage(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, Kdo_VkImage *imageSrc, Kdo_VkCatBufferToImageInfo info)
+void	kdo_reallocImageBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferSrc, VkDeviceSize newSize, Kdo_VkImageFuncInfo funcInfo)
 {
-	Kdo_VkImage				imageDst;
-	VkCommandBuffer			copy;
-	VkImageMemoryBarrier	*imageBarrierInfo;
-	VkImageCopy				copyImageInfo;
-	VkBufferImageCopy		copyBufferInfo;
-	uint32_t				i;
-	uint32_t				j;
+	Kdo_VkImageBuffer	imageBufferDst;
 
-	imageDst.properties.memoryFilter	= imageSrc->properties.memoryFilter;
-	imageDst.properties.layout			= info.layout;
-	imageDst.properties.waitFlags		= imageSrc->properties.waitFlags;
-	imageDst.divCount					= imageSrc->divCount + info.imagesCount;
-	if (!(imageDst.div					= malloc(imageDst.divCount * sizeof(Kdo_VkImageDiv))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	if (newSize == imageBufferSrc->sizeUsed + imageBufferSrc->sizeFree)
+		return ;
+	
+	imageBufferDst.properties.layout		= VK_IMAGE_LAYOUT_UNDEFINED;
+	imageBufferDst.properties.memoryFlags	= imageBufferSrc->properties.memoryFlags;
+	imageBufferDst.properties.memoryFilter	= imageBufferSrc->properties.memoryFilter;
+	imageBufferDst.properties.waitFlags		= imageBufferSrc->properties.waitFlags;
+	imageBufferDst.sizeUsed					= kdo_minSize(imageBufferSrc->sizeUsed, newSize);
+	imageBufferDst.sizeFree					= newSize - imageBufferDst.sizeUsed; 
+	kdo_allocImageBuffer(vk, &imageBufferDst);
 
-	memcpy(imageDst.div, imageSrc->div, imageSrc->divCount * sizeof(Kdo_VkImageDiv));
-	for (i = 0; i < info.imagesCount; i++)
-		imageDst.div[imageSrc->divCount + i].extent = info.extents[i];
-
-	kdo_allocImage(vk, &imageDst, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, info.func);
-	if (!(imageBarrierInfo	= malloc((imageDst.divCount + imageSrc->divCount) * sizeof(VkImageMemoryBarrier))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	kdo_beginUniqueCommand(vk, &copy);
-
-	for (i = 0; i < imageDst.divCount; i++)
-	{
-		imageBarrierInfo[i].sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrierInfo[i].pNext                           = NULL;
-        imageBarrierInfo[i].srcAccessMask                   = 0;
-        imageBarrierInfo[i].dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageBarrierInfo[i].newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        imageBarrierInfo[i].srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].image                           = imageDst.div[i].image;
-        imageBarrierInfo[i].subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrierInfo[i].subresourceRange.baseMipLevel   = 0;
-        imageBarrierInfo[i].subresourceRange.levelCount     = 1;
-        imageBarrierInfo[i].subresourceRange.baseArrayLayer = 0;
-        imageBarrierInfo[i].subresourceRange.layerCount     = 1;
-	}
-	for (j = 0; j < imageSrc->divCount; j++)
-	{
-		imageBarrierInfo[i].sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrierInfo[i].pNext                           = NULL;
-        imageBarrierInfo[i].srcAccessMask                   = 0;
-        imageBarrierInfo[i].dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].oldLayout                       = imageSrc->properties.layout;
-        imageBarrierInfo[i].newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        imageBarrierInfo[i].srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrierInfo[i].image                           = imageSrc->div[j].image;
-        imageBarrierInfo[i].subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrierInfo[i].subresourceRange.baseMipLevel   = 0;
-        imageBarrierInfo[i].subresourceRange.levelCount     = 1;
-        imageBarrierInfo[i].subresourceRange.baseArrayLayer = 0;
-        imageBarrierInfo[i].subresourceRange.layerCount     = 1;
-		i++;
-	}
-	vkCmdPipelineBarrier(copy, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, imageDst.divCount + imageSrc->divCount, imageBarrierInfo);
-
-	copyImageInfo.srcSubresource.aspectMask			= VK_IMAGE_ASPECT_COLOR_BIT;
-	copyImageInfo.srcSubresource.mipLevel			= 0;
-	copyImageInfo.srcSubresource.baseArrayLayer		= 0;
-	copyImageInfo.srcSubresource.layerCount			= 1;
-	copyImageInfo.srcOffset.x						= 0;
-	copyImageInfo.srcOffset.y						= 0;
-	copyImageInfo.srcOffset.z						= 0;
-	copyImageInfo.dstSubresource.aspectMask			= VK_IMAGE_ASPECT_COLOR_BIT;
-	copyImageInfo.dstSubresource.mipLevel			= 0;
-	copyImageInfo.dstSubresource.baseArrayLayer		= 0;
-	copyImageInfo.dstSubresource.layerCount			= 1;
-	copyImageInfo.dstOffset.x						= 0;
-	copyImageInfo.dstOffset.y						= 0;
-	copyImageInfo.dstOffset.z						= 0;
-
-	copyBufferInfo.bufferRowLength					= 0;
-    copyBufferInfo.bufferImageHeight				= 0;
-    copyBufferInfo.imageSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-    copyBufferInfo.imageSubresource.mipLevel        = 0;
-    copyBufferInfo.imageSubresource.baseArrayLayer  = 0;
-    copyBufferInfo.imageSubresource.layerCount      = 1;
-    copyBufferInfo.imageOffset.x                    = 0;
-    copyBufferInfo.imageOffset.y                    = 0;
-    copyBufferInfo.imageOffset.z                    = 0;
-
-	for (i = 0; i < imageSrc->divCount; i++)
-	{
-		copyImageInfo.extent	= imageSrc->div[i].extent;
-		vkCmdCopyImage(copy, imageSrc->div[i].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageDst.div[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyImageInfo);
-
-		imageBarrierInfo[i].srcAccessMask	= VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].dstAccessMask	= VK_ACCESS_SHADER_READ_BIT;
-        imageBarrierInfo[i].oldLayout		= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageBarrierInfo[i].newLayout		= imageDst.properties.layout;
-	}
-
-	for (j = 0; j < bufferSrc->divCount; j++)
-	{
-		copyBufferInfo.bufferOffset	= bufferSrc->div[j].offset;
-        copyBufferInfo.imageExtent	= imageDst.div[i].extent;
-        vkCmdCopyBufferToImage(copy, bufferSrc->buffer, imageDst.div[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyBufferInfo);
-
-		imageBarrierInfo[i].srcAccessMask	= VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageBarrierInfo[i].dstAccessMask	= VK_ACCESS_SHADER_READ_BIT;
-        imageBarrierInfo[i].oldLayout		= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageBarrierInfo[i].newLayout		= imageDst.properties.layout;
-		i++;
-	}
-	vkCmdPipelineBarrier(copy, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, imageDst.divCount, imageBarrierInfo);
-
-	kdo_endUniqueCommand(vk, &copy);
-	free(imageBarrierInfo);
-	kdo_freeBuffer(vk, bufferSrc);
-	kdo_freeImage(vk, imageSrc);
-
-	return (imageDst);
+	for (uint32_t i = 0; i < imageBufferSrc->imageCount && imageBufferSrc->image[i].size <= imageBufferSrc->sizeFree; i++)
+		kdo_appendImageFromImage(vk, &imageBufferDst, imageBufferSrc, i, funcInfo);
+	
+	kdo_freeImageBuffer(vk, imageBufferSrc);
+	*imageBufferSrc = imageBufferDst;
 }
 
-Kdo_VkBuffer	kdo_loadData(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadDataInfo *info)
+void	kdo_appendImageFromImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, Kdo_VkImageBuffer *imageBufferSrc, uint32_t imageIndex, Kdo_VkImageFuncInfo funcInfo)
 {
-	Kdo_VkBuffer	bufferDst = {};
-	VkDeviceSize	offset;
-	uint32_t		i;
+	VkCommandBuffer         commandBuffer;
+	VkImageCopy             copyInfo;	
+
+	kdo_appendNewImage(vk, imageBufferDst, imageBufferSrc->image[imageIndex].extent, funcInfo);
+	if (imageBufferDst->sizeFree < imageBufferDst->image[imageBufferDst->imageCount].size)
+		kdo_reallocImageBuffer(vk, imageBufferDst, imageBufferDst->sizeUsed + imageBufferDst->image[imageBufferDst->imageCount].size, funcInfo);
+	vkBindImageMemory(vk->device.path, imageBufferDst->image[imageBufferDst->imageCount].image, imageBufferDst->memory, imageBufferDst->sizeUsed); 
+
+	kdo_beginUniqueCommand(vk, &commandBuffer);
+
+	kdo_cmdImageBarrier(commandBuffer, imageBufferDst->image[imageBufferDst->imageCount].image, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	kdo_cmdImageBarrier(commandBuffer, imageBufferSrc->image[imageIndex].image, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, imageBufferSrc->properties.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	
+	copyInfo.srcSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyInfo.srcSubresource.mipLevel        = 0;
+	copyInfo.srcSubresource.baseArrayLayer  = 0;
+	copyInfo.srcSubresource.layerCount      = 1;
+	copyInfo.srcOffset.x                    = 0;
+	copyInfo.srcOffset.y                    = 0;
+	copyInfo.srcOffset.z                    = 0;
+	copyInfo.dstSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyInfo.dstSubresource.mipLevel        = 0;
+	copyInfo.dstSubresource.baseArrayLayer  = 0;
+	copyInfo.dstSubresource.layerCount      = 1;
+	copyInfo.dstOffset.x                    = 0;
+	copyInfo.dstOffset.y                    = 0;
+	copyInfo.dstOffset.z                    = 0;
+	copyInfo.extent							= imageBufferSrc->image[imageIndex].extent;
+	vkCmdCopyImage(commandBuffer, imageBufferSrc->image[imageIndex].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageBufferDst->image[imageBufferDst->imageCount].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
+
+	kdo_cmdImageBarrier(commandBuffer, imageBufferDst->image[imageBufferDst->imageCount].image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageBufferDst->properties.layout);
+	kdo_cmdImageBarrier(commandBuffer, imageBufferSrc->image[imageIndex].image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageBufferSrc->properties.layout);
+
+	kdo_endUniqueCommand(vk, &commandBuffer);
+
+	imageBufferDst->sizeUsed += imageBufferDst->image[imageBufferDst->imageCount].size;
+	imageBufferDst->sizeFree -= imageBufferDst->image[imageBufferDst->imageCount].size;
+}
+
+void	kdo_appendImageFromBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, Kdo_VkBuffer *bufferSrc, VkDeviceSize offset, VkExtent3D extent, Kdo_VkImageFuncInfo funcInfo)
+{
+	VkCommandBuffer         commandBuffer;
+	VkBufferImageCopy       copyBufferInfo;
+
+	kdo_appendNewImage(vk, imageBufferDst, extent, funcInfo);
+	if (imageBufferDst->sizeFree < imageBufferDst->image[imageBufferDst->imageCount].size)
+		kdo_reallocImageBuffer(vk, imageBufferDst, imageBufferDst->sizeUsed + imageBufferDst->image[imageBufferDst->imageCount].size, funcInfo);
+	vkBindImageMemory(vk->device.path, imageBufferDst->image[imageBufferDst->imageCount].image, imageBufferDst->memory, imageBufferDst->sizeUsed); 
+
+	kdo_beginUniqueCommand(vk, &commandBuffer);
+
+	kdo_cmdImageBarrier(commandBuffer, imageBufferDst->image[imageBufferDst->imageCount].image, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	copyBufferInfo.bufferRowLength                  = 0;
+	copyBufferInfo.bufferImageHeight                = 0;
+	copyBufferInfo.imageSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyBufferInfo.imageSubresource.mipLevel        = 0;
+	copyBufferInfo.imageSubresource.baseArrayLayer  = 0;
+	copyBufferInfo.imageSubresource.layerCount      = 1;
+	copyBufferInfo.imageOffset.x                    = 0;
+	copyBufferInfo.imageOffset.y                    = 0;
+	copyBufferInfo.imageOffset.z                    = 0;
+	copyBufferInfo.bufferOffset						= offset;
+	copyBufferInfo.imageExtent						= extent;
+	vkCmdCopyBufferToImage(commandBuffer, bufferSrc->buffer, imageBufferDst->image[imageBufferDst->imageCount].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyBufferInfo);
+
+	kdo_cmdImageBarrier(commandBuffer, imageBufferDst->image[imageBufferDst->imageCount].image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, imageBufferDst->properties.layout);
+
+	kdo_endUniqueCommand(vk, &commandBuffer);
+
+	imageBufferDst->sizeUsed += imageBufferDst->image[imageBufferDst->imageCount].size;
+	imageBufferDst->sizeFree -= imageBufferDst->image[imageBufferDst->imageCount].size;
+}
+
+void	kdo_appendImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, char *imagePath, Kdo_VkImageFuncInfo funcInfo)
+{
+	Kdo_VkBuffer	stagingBuffer = kdo_newBuffer(vk, 0, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0);
+	VkExtent3D		extent;
+	int				texChannels;
 	void			*data;
 
-	bufferDst.properties.usage		= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	bufferDst.size					= 0;
-	bufferDst.divCount				= infoCount;
-	if (!(bufferDst.div				= malloc(infoCount * sizeof(Kdo_VkBufferDiv))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	extent.depth = 1;
+	if (!(data      = stbi_load(imagePath, (int *)&extent.width, (int *)&extent.height, &texChannels, STBI_rgb_alpha)))
+		kdo_cleanup(vk, "Image load failed", 29);
 
-	for (i = 0; i < infoCount; i++)
-	{
-		bufferDst.div[i].offset			= bufferDst.size;
-		bufferDst.div[i].elementSize	= info[i].elementSize;
-		bufferDst.div[i].count			= info[i].count;
-
-		bufferDst.size += info[i].count * info[i].elementSize;
-	}
-
-	kdo_allocBuffer(vk, &bufferDst, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	offset = 0;
-	vkMapMemory(vk->device.path, bufferDst.memory, 0, VK_WHOLE_SIZE, 0, &data);
-	for (i = 0; i < infoCount; i++)
-	{
-		memcpy(data + offset, info[i].data, info[i].count * info[i].elementSize);
-		offset += info[i].count * info[i].elementSize;
-	}
-	vkUnmapMemory(vk->device.path, bufferDst.memory);
-
-	return (bufferDst);
+	kdo_setData(vk, &stagingBuffer, data, extent.width * extent.height * 4, 0);
+	kdo_appendImageFromBuffer(vk, imageBufferDst, &stagingBuffer, 0, extent, funcInfo);
+	kdo_freeBuffer(vk, &stagingBuffer);
 }

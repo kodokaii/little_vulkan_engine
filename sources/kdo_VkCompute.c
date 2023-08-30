@@ -68,8 +68,6 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 void kdo_compute(Kdo_Vulkan *vk)
 {
 	double			currentTime	= glfwGetTime();
-	static double	time		= 0;
-	static int		start		= 1;
 
 	if (0.00185f < currentTime - vk->camera.moveTime)
 	{
@@ -77,104 +75,25 @@ void kdo_compute(Kdo_Vulkan *vk)
 		vk->camera.moveTime	= currentTime;
 	}
 
-	if (start)
+	if (!vk->compute.start)
 	{
-		VkDrawIndexedIndirectCommand	drawCommand;
-		Kdo_ShLight						light = {{5.0f, 0.0f, -10.0f, 10.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
-		Kdo_VkLoadDataInfo				loadInfo;
-		Kdo_VkObjectInfo				objectInfo = kdo_openObj(vk, "obj/bugatti.obj");
-		Kdo_VkBuffer					stagingBuffer;
-		VkWriteDescriptorSet			descriptorWrite[4];
-		VkDescriptorBufferInfo			writeBufferInfo[4];
+		Kdo_ShLight			light = {{5.0f, 0.0f, -10.0f, 10.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
+		Kdo_VkObjectInfo	objectInfo = kdo_openObj(vk, "obj/aircraft/aircraft.obj");
+		mat4				mat[2] = {GLM_MAT4_IDENTITY_INIT, GLM_MAT4_IDENTITY_INIT};
 
-		objectInfo.name = "bugatti";
-		kdo_loadObject(vk, 1, &objectInfo);
+		kdo_loadObject(vk, objectInfo);
 
-		drawCommand.indexCount		= vk->core.index.div->count;
-		drawCommand.instanceCount	= 1;
-		drawCommand.firstIndex		= 0;
-		drawCommand.vertexOffset	= 0;
-		drawCommand.firstInstance	= 0;
+		kdo_setData(vk, &vk->core.buffer.light, &light, sizeof(Kdo_ShLight), vk->core.buffer.light.sizeUsed);
+		glm_rotate_x(mat[0], glm_rad(-90), mat[0]);
+		glm_mat4_dup(mat[0], mat[1]);
 
-		loadInfo.elementSize		= sizeof(VkDrawIndexedIndirectCommand);
-		loadInfo.count				= 1;
-		loadInfo.data				= &drawCommand;
-		stagingBuffer			= kdo_loadData(vk, 1, &loadInfo);
-		vk->core.drawCommand	= kdo_catBuffer(vk, &vk->core.drawCommand, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		loadInfo.elementSize		= sizeof(Kdo_ShLight);
-		loadInfo.count				= 1;
-		loadInfo.data				= &light;
-		stagingBuffer		= kdo_loadData(vk, 1, &loadInfo);
-		vk->core.light		= kdo_catBuffer(vk, &vk->core.light, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		writeBufferInfo[0].buffer	= vk->core.objectMap.buffer;
-		writeBufferInfo[0].offset	= 0;
-		writeBufferInfo[0].range	= vk->core.objectMap.size;
-
-		writeBufferInfo[1].buffer	= vk->core.materialMap.buffer;
-		writeBufferInfo[1].offset	= 0;
-		writeBufferInfo[1].range	= vk->core.materialMap.size;
-
-		writeBufferInfo[2].buffer	= vk->core.light.buffer;
-		writeBufferInfo[2].offset	= 0;
-		writeBufferInfo[2].range	= vk->core.light.size;
-
-		writeBufferInfo[3].buffer	= vk->core.materials.buffer;
-		writeBufferInfo[3].offset	= 0;
-		writeBufferInfo[3].range	= vk->core.materials.size;
-
-
-		descriptorWrite[0].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite[0].pNext               = NULL;
-		descriptorWrite[0].dstSet              = vk->core.descriptorSet;
-		descriptorWrite[0].dstBinding          = 0;
-		descriptorWrite[0].dstArrayElement     = 0;
-		descriptorWrite[0].descriptorCount     = 1;
-		descriptorWrite[0].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite[0].pImageInfo          = NULL;
-		descriptorWrite[0].pBufferInfo         = writeBufferInfo;
-		descriptorWrite[0].pTexelBufferView    = NULL;
-
-		descriptorWrite[1].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite[1].pNext               = NULL;
-		descriptorWrite[1].dstSet              = vk->core.descriptorSet;
-		descriptorWrite[1].dstBinding          = 1;
-		descriptorWrite[1].dstArrayElement     = 0;
-		descriptorWrite[1].descriptorCount     = 1;
-		descriptorWrite[1].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite[1].pImageInfo          = NULL;
-		descriptorWrite[1].pBufferInfo         = writeBufferInfo + 1;
-		descriptorWrite[1].pTexelBufferView    = NULL;
-	
-		descriptorWrite[2].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite[2].pNext               = NULL;
-		descriptorWrite[2].dstSet              = vk->core.descriptorSet;
-		descriptorWrite[2].dstBinding          = 4;
-		descriptorWrite[2].dstArrayElement     = 0;
-		descriptorWrite[2].descriptorCount     = 1;
-		descriptorWrite[2].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite[2].pImageInfo          = NULL;
-		descriptorWrite[2].pBufferInfo         = writeBufferInfo + 2;
-		descriptorWrite[2].pTexelBufferView    = NULL;
-
-		descriptorWrite[3].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite[3].pNext               = NULL;
-		descriptorWrite[3].dstSet              = vk->core.descriptorSet;
-		descriptorWrite[3].dstBinding          = 5;
-		descriptorWrite[3].dstArrayElement     = 0;
-		descriptorWrite[3].descriptorCount     = 1;
-		descriptorWrite[3].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite[3].pImageInfo          = NULL;
-		descriptorWrite[3].pBufferInfo         = writeBufferInfo + 3;
-		descriptorWrite[3].pTexelBufferView    = NULL;
-		vkUpdateDescriptorSets(vk->device.path, 4, descriptorWrite, 0, NULL);
-
-		start = 0;
+		kdo_setData(vk, &vk->core.buffer.object, mat, 2 * sizeof(mat4), 0);
+		
+		vk->compute.start = 1;
 	}
 
-	if (0.01 < currentTime - time)
+	if (0.01 < currentTime - vk->compute.time)
 	{
-		time = currentTime;
+		vk->compute.time = currentTime;
 	}
 }

@@ -91,14 +91,13 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 	if (vk->device.path)
 		vkDeviceWaitIdle(vk->device.path);
 
-	kdo_freeBuffer(vk, &vk->core.vertex);
-	kdo_freeBuffer(vk, &vk->core.index);
-	kdo_freeBuffer(vk, &vk->core.materials);
-	kdo_freeBuffer(vk, &vk->core.materialMap);
-	kdo_freeBuffer(vk, &vk->core.objectMap);
-	kdo_freeBuffer(vk, &vk->core.light);
-	kdo_freeBuffer(vk, &vk->core.drawCommand);
-	kdo_freeImage(vk, &vk->core.textures);
+	kdo_freeBuffer(vk, &vk->core.buffer.vertex);
+	kdo_freeBuffer(vk, &vk->core.buffer.index);
+	kdo_freeBuffer(vk, &vk->core.buffer.materials);
+	kdo_freeBuffer(vk, &vk->core.buffer.materialMap);
+	kdo_freeBuffer(vk, &vk->core.buffer.object);
+	kdo_freeBuffer(vk, &vk->core.buffer.light);
+	kdo_freeImageBuffer(vk, &vk->core.buffer.textures);
 
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->core.descriptorPool)
 	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->core.sampler.basic)

@@ -147,14 +147,6 @@ uint32_t	findTextureMemoryFiltrer(Kdo_Vulkan *vk)
 	return (memRequirements.memoryTypeBits);
 }
 
-void	*kdo_reallocMerge(size_t sizeDst, void *dst, size_t sizeSrc, void *src)
-{
-	dst = realloc(dst, sizeDst + sizeSrc);
-	memcpy(dst + sizeDst, src, sizeSrc);
-
-	return (dst);
-}
-
 VkDeviceSize	kdo_minSize(VkDeviceSize val1, VkDeviceSize val2)
 {
 	if (val1 <= val2)

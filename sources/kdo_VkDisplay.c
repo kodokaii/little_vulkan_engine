@@ -11,7 +11,7 @@
 
 #include "kdo_VkDisplay.h"
 
-static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkBuffer *drawCommandBuffer)
+static void	kdo_updateRenderCommand(Kdo_Vulkan *vk)
 {
 	VkCommandBufferBeginInfo		bufferBeginInfo;
 	VkViewport						viewport;
@@ -62,14 +62,14 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk, Kdo_VkBuffer *drawCommandBuf
 
 	vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &vk->core.descriptorSet, 0, NULL);
 
-	vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &vk->core.vertex.buffer, vertexOffsets);
-	vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, vk->core.index.buffer, 0, VK_INDEX_TYPE_UINT32);
+	vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &vk->core.buffer.vertex.buffer, vertexOffsets);
+	vkCmdBindIndexBuffer(vk->display.renderPool[vk->display.currentImage].main, vk->core.buffer.index.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 	glm_mat4_dup(vk->camera.path, push.camera);
 	glm_vec4_dup(vk->camera.pos, push.cameraPos);
 	vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Kdo_VkPush), &push);
 
-	vkCmdDrawIndexedIndirect(vk->display.renderPool[vk->display.currentImage].main, drawCommandBuffer->buffer, 0, drawCommandBuffer->divCount, sizeof(VkDrawIndexedIndirectCommand));
+	vkCmdDrawIndexedIndirect(vk->display.renderPool[vk->display.currentImage].main, vk->core.buffer.object.buffer, offsetof(Kdo_ShObjectMap, drawCommand), vk->core.count.object, sizeof(Kdo_ShObjectMap));
 	vkCmdEndRenderPass(vk->display.renderPool[vk->display.currentImage].main);
 
 	if (vkEndCommandBuffer(vk->display.renderPool[vk->display.currentImage].main) != VK_SUCCESS)
@@ -108,7 +108,7 @@ static void	kdo_drawFrame(Kdo_Vulkan *vk)
 	vk->display.frameToImage[vk->display.currentFrame].path = vk->display.imageToFrame + vk->display.currentImage;
 
 	kdo_compute(vk);
-	kdo_updateRenderCommand(vk, &vk->core.drawCommand);
+	kdo_updateRenderCommand(vk);
 
 	submitInfo.sType					= VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.pNext					= NULL;

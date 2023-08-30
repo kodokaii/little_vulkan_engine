@@ -6,12 +6,16 @@
 
 struct ObjectMap
 {
-    mat4 modelMat;
-    mat4 normalMat;
-	uint materialOffset;
-	uint pad0;
-	uint pad1;
-	uint pad2;
+    mat4	modelMat;
+    mat4	normalMat;
+	uint	materialOffset;
+	uint	indexCount;
+	uint	instanceCount;
+	uint	firstIndex;
+	int		vertexOffset;
+	uint	firstInstance;
+	uint	pad0;
+	uint	pad1;
 };
 
 layout(location = 0) in vec3 inPos;

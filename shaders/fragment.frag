@@ -36,7 +36,7 @@ layout(location = 3) flat in uint	inMaterialIndex;
 layout(location = 0) out vec4 outColor;
 
 layout(binding = 2) uniform sampler samp;
-layout(binding = 3) uniform texture2D textures[MAX_TEXTURE];
+layout(binding = 3) uniform texture2D tex[MAX_TEXTURE];
 layout(binding = 4) uniform LightBuffer
 {
     Light       light[MAX_LIGHT];
@@ -77,7 +77,7 @@ void main() {
 	reflectDir		= reflect(-lightDir, inNormal);
 
 	ambient			= vec3(material.Ka) * ambientLight;
-	diffuse			= vec3(material.Kd) * vec3(lightBuffer.light[0].color_stop) * max(dot(inNormal, lightDir), 0.0);
+	diffuse			= vec3(texture(sampler2D(tex[material.map_Kd], samp) , inTexCoord)) * vec3(material.Kd) * vec3(lightBuffer.light[0].color_stop) * max(dot(inNormal, lightDir), 0.0);
 	specular		= vec3(material.Ks) * vec3(lightBuffer.light[0].color_stop) * pow(max(dot(viewDir, reflectDir), 0.0), material.Ns);
 
 	outColor = vec4(ambient + diffuse + specular, 1);

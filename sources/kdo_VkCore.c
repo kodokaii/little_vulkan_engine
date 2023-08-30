@@ -11,100 +11,8 @@
 
 #include "kdo_VkCore.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
-
 #define FAST_OBJ_IMPLEMENTATION
 #include "objLoader/fast_obj.h"
-
-static void	kdo_initSampler(Kdo_Vulkan *vk)
-{
-	VkSamplerCreateInfo		samplerInfo;
-
-	samplerInfo.sType					= VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.pNext					= NULL;
-	samplerInfo.flags					= 0;
-	samplerInfo.magFilter				= VK_FILTER_LINEAR;
-	samplerInfo.minFilter				= VK_FILTER_LINEAR;
-	samplerInfo.mipmapMode				= VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.addressModeU			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.mipLodBias				= 0.0f;
-	samplerInfo.anisotropyEnable		= VK_TRUE;
-	samplerInfo.maxAnisotropy			= 16.0f;
-	samplerInfo.compareEnable			= VK_FALSE;
-	samplerInfo.compareOp				= VK_COMPARE_OP_ALWAYS;
-	samplerInfo.minLod					= 0.0f;
-	samplerInfo.maxLod					= 0.0f;
-	samplerInfo.borderColor				= VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates	= VK_FALSE;
-	if (vkCreateSampler(vk->device.path, &samplerInfo, NULL, &vk->core.sampler.basic) != VK_SUCCESS)
-		kdo_cleanup(vk, "Sampler creation failed", 23);
-}
-
-static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
-{
-	VkDescriptorPoolSize			descriptorPoolSize[6];
-	VkDescriptorPoolCreateInfo		descriptorPoolInfo;
-	VkDescriptorSetAllocateInfo     allocInfo;
-	VkDescriptorImageInfo			imageInfo;
-	VkWriteDescriptorSet			descriptorWrite;
-	char							*defaultTexture = DEFAULT_TEXTURE;
-
-	descriptorPoolSize[0].type				= VK_DESCRIPTOR_TYPE_SAMPLER;
-	descriptorPoolSize[0].descriptorCount	= 1;
-
-	descriptorPoolSize[1].type				= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorPoolSize[1].descriptorCount	= 1;
-
-	descriptorPoolSize[2].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorPoolSize[2].descriptorCount	= 1;
-
-	descriptorPoolSize[3].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorPoolSize[3].descriptorCount	= 1;
-
-	descriptorPoolSize[4].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorPoolSize[4].descriptorCount	= 1;
-
-	descriptorPoolSize[5].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorPoolSize[5].descriptorCount	= 1;
-
-	descriptorPoolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolInfo.pNext			= NULL;
-	descriptorPoolInfo.flags			= 0;
-	descriptorPoolInfo.maxSets			= 1;
-	descriptorPoolInfo.poolSizeCount	= 6;
-	descriptorPoolInfo.pPoolSizes		= descriptorPoolSize;
-	if (vkCreateDescriptorPool(vk->device.path, &descriptorPoolInfo, NULL, &vk->core.descriptorPool) != VK_SUCCESS)
-		kdo_cleanup(vk, "Descriptor pool creation failed", 23);
-
-	allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.pNext                 = NULL;
-	allocInfo.descriptorPool        = vk->core.descriptorPool;
-	allocInfo.descriptorSetCount    = 1;
-	allocInfo.pSetLayouts           = &vk->graphicsPipeline.descriptorLayout;
-	if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &vk->core.descriptorSet) != VK_SUCCESS)
-              kdo_cleanup(vk, "Descriptor set allocation failed", 35);
-
-	imageInfo.sampler		= vk->core.sampler.basic;
-	imageInfo.imageView		= 0;
-	imageInfo.imageLayout	= 0;
-
-	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.pNext				= NULL;
-	descriptorWrite.dstSet				= vk->core.descriptorSet;
-	descriptorWrite.dstBinding			= 2;
-	descriptorWrite.dstArrayElement		= 0;
-	descriptorWrite.descriptorCount		= 1;
-	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
-	descriptorWrite.pImageInfo			= &imageInfo;
-	descriptorWrite.pBufferInfo			= NULL;
-	descriptorWrite.pTexelBufferView	= NULL;
-	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
-
-	kdo_loadTextures(vk, 1, &defaultTexture);
-}
 
 static float	kdo_vec2Cmp(const vec2 vecteur1, const vec2 vecteur2)
 {
@@ -133,7 +41,7 @@ static float	kdo_vertexCmp(const Kdo_Vertex vertex1, const Kdo_Vertex vertex2)
 	return (kdo_vec2Cmp(vertex1.tex, vertex2.tex));
 }
 
-static uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sortIndex , uint32_t sortCount)
+static uint32_t	kdo_sortMesh(Kdo_Vertex *vertex, uint32_t toSortCount, uint32_t *sortIndex, uint32_t *index)
 {
 	uint32_t	beforeCount	= 0;
 	uint32_t	sameCount	= 1;
@@ -141,29 +49,29 @@ static uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sor
 	uint32_t	buffer;
 	float		res;
 
-	while (beforeCount + sameCount + afterCount < sortCount)
+	while (beforeCount + sameCount + afterCount < toSortCount)
 	{
 		res = kdo_vertexCmp(vertex[sortIndex[beforeCount]], vertex[sortIndex[beforeCount + sameCount]]);
 
 		if (res < 0)
 		{
-			buffer								= sortIndex[beforeCount];
-			sortIndex[beforeCount]				= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]	= buffer;
+			buffer											= sortIndex[beforeCount];
+			sortIndex[beforeCount]							= sortIndex[beforeCount + sameCount];
+			sortIndex[beforeCount + sameCount]				= buffer;
 
-			index[sortIndex[beforeCount]]				-= sameCount;
-			index[sortIndex[beforeCount + sameCount]]	+= sameCount;
+			index[sortIndex[beforeCount]]					-= sameCount;
+			index[sortIndex[beforeCount + sameCount]]		+= sameCount;
 
 			beforeCount++;
 		}
 		else if (0 < res)
 		{
-			buffer									= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]		= sortIndex[sortCount - afterCount - 1];
-			sortIndex[sortCount - afterCount - 1]	= buffer;
+			buffer											= sortIndex[beforeCount + sameCount];
+			sortIndex[beforeCount + sameCount]				= sortIndex[toSortCount - afterCount - 1];
+			sortIndex[toSortCount - afterCount - 1]			= buffer;
 
-			index[sortIndex[beforeCount + sameCount]]		-= sortCount - afterCount - beforeCount - sameCount - 1;
-			index[sortIndex[sortCount - afterCount - 1]]	+= sortCount - afterCount - beforeCount - sameCount - 1;
+			index[sortIndex[beforeCount + sameCount]]		-= toSortCount - afterCount - beforeCount - sameCount - 1;
+			index[sortIndex[toSortCount - afterCount - 1]]	+= toSortCount - afterCount - beforeCount - sameCount - 1;
 
 			afterCount++;
 		}
@@ -172,11 +80,52 @@ static uint32_t	kdo_splitMesh(Kdo_Vertex *vertex, uint32_t *index, uint32_t *sor
 	}
 
 	if (1 < beforeCount)
-		sameCount += kdo_splitMesh(vertex, index, sortIndex, beforeCount);
+		sameCount += kdo_sortMesh(vertex, beforeCount, sortIndex, index);
 	if (1 < afterCount)
-		sameCount += kdo_splitMesh(vertex, index, sortIndex + sortCount - afterCount, afterCount);
+		sameCount += kdo_sortMesh(vertex, afterCount, &sortIndex[toSortCount - afterCount], index);
 
 	return (sameCount - 1);
+}
+
+
+static uint32_t	kdo_splitMesh(Kdo_Vulkan *vk, Kdo_Vertex *vertexIn, uint32_t vertexInCount, Kdo_Vertex **vertexOut, uint32_t **indexOut)
+{
+	uint32_t	*sortVertexIndex;
+	uint32_t	vertexOutCount;
+	uint32_t	currentVertexIn;
+	uint32_t	currentVertexOut;
+	uint32_t	currentSameVertexCount;
+
+	if (!(*indexOut			= malloc(vertexInCount * sizeof(uint32_t))))
+			kdo_cleanup(vk, ERRLOC, 12);
+	if (!(sortVertexIndex	= malloc(vertexInCount * sizeof(uint32_t))))
+			kdo_cleanup(vk, ERRLOC, 12);
+
+	for (uint32_t i = 0; i < vertexInCount; i++)
+	{
+		(*indexOut)[i]		= i;
+		sortVertexIndex[i]	= i;
+	}
+	vertexOutCount = vertexInCount - kdo_sortMesh(vertexIn, vertexInCount, sortVertexIndex, *indexOut);
+	if (!(*vertexOut = malloc(vertexOutCount * sizeof(Kdo_Vertex))))
+		kdo_cleanup(vk, ERRLOC, 12);
+
+	currentVertexIn = 1;
+	currentVertexOut = 1;
+	currentSameVertexCount = 0;
+	(*vertexOut)[0] = vertexIn[sortVertexIndex[0]];
+	while (currentVertexIn < vertexInCount)
+	{
+		if (kdo_vertexCmp(vertexIn[sortVertexIndex[currentVertexIn]], vertexIn[sortVertexIndex[currentVertexIn - 1]]))
+			(*vertexOut)[currentVertexOut++] = vertexIn[sortVertexIndex[currentVertexIn]];
+		else
+			currentSameVertexCount++;
+		(*indexOut)[sortVertexIndex[currentVertexIn]] -= currentSameVertexCount;
+		currentVertexIn++;
+	}
+
+	free(sortVertexIndex);
+	return (vertexOutCount);
 }
 
 static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *normal)
@@ -189,14 +138,182 @@ static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *no
 	glm_vec3_crossn(x, y, *normal);
 }
 
-static void	kdo_initTransform(Kdo_VkTransform *transform)
+static void	kdo_initSampler(Kdo_Vulkan *vk) {
+	VkSamplerCreateInfo		samplerInfo;
+
+	samplerInfo.sType					= VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.pNext					= NULL;
+	samplerInfo.flags					= 0;
+	samplerInfo.magFilter				= VK_FILTER_LINEAR;
+	samplerInfo.minFilter				= VK_FILTER_LINEAR;
+	samplerInfo.mipmapMode				= VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.addressModeU			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW			= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.mipLodBias				= 0.0f;
+	samplerInfo.anisotropyEnable		= VK_TRUE;
+	samplerInfo.maxAnisotropy			= 16.0f;
+	samplerInfo.compareEnable			= VK_FALSE;
+	samplerInfo.compareOp				= VK_COMPARE_OP_ALWAYS;
+	samplerInfo.minLod					= 0.0f;
+	samplerInfo.maxLod					= 0.0f;
+	samplerInfo.borderColor				= VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates	= VK_FALSE;
+	if (vkCreateSampler(vk->device.path, &samplerInfo, NULL, &vk->core.sampler.basic) != VK_SUCCESS)
+		kdo_cleanup(vk, "Sampler creation failed", 30);
+}
+
+static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
 {
-	glm_mat4_identity(transform->modelMat);
-	glm_mat4_identity(transform->normalMat);
-	glm_vec3_zero(transform->pos);
-	glm_vec3_zero(transform->rot);
-	glm_vec3_one(transform->scale);
-	transform->status = 0;
+	VkDescriptorPoolSize			descriptorPoolSize[6];
+	VkDescriptorPoolCreateInfo		descriptorPoolInfo;
+	VkDescriptorSetAllocateInfo     allocInfo;
+	VkDescriptorImageInfo			imageInfo;
+	VkWriteDescriptorSet			descriptorWrite;
+
+	descriptorPoolSize[0].type				= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorPoolSize[0].descriptorCount	= 1;
+
+	descriptorPoolSize[1].type				= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descriptorPoolSize[1].descriptorCount	= 128;
+
+	descriptorPoolSize[2].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorPoolSize[2].descriptorCount	= 1;
+
+	descriptorPoolSize[3].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorPoolSize[3].descriptorCount	= 1;
+
+	descriptorPoolSize[4].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorPoolSize[4].descriptorCount	= 1;
+
+	descriptorPoolSize[5].type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorPoolSize[5].descriptorCount	= 1;
+
+	descriptorPoolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolInfo.pNext			= NULL;
+	descriptorPoolInfo.flags			= 0;
+	descriptorPoolInfo.maxSets			= 1;
+	descriptorPoolInfo.poolSizeCount	= 6;
+	descriptorPoolInfo.pPoolSizes		= descriptorPoolSize;
+	if (vkCreateDescriptorPool(vk->device.path, &descriptorPoolInfo, NULL, &vk->core.descriptorPool) != VK_SUCCESS)
+		kdo_cleanup(vk, "Descriptor pool creation failed", 31);
+
+	allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.pNext                 = NULL;
+	allocInfo.descriptorPool        = vk->core.descriptorPool;
+	allocInfo.descriptorSetCount    = 1;
+	allocInfo.pSetLayouts           = &vk->graphicsPipeline.descriptorLayout;
+	if (vkAllocateDescriptorSets(vk->device.path, &allocInfo, &vk->core.descriptorSet) != VK_SUCCESS)
+              kdo_cleanup(vk, "Descriptor set allocation failed", 32);
+
+	imageInfo.sampler		= vk->core.sampler.basic;
+	imageInfo.imageView		= 0;
+	imageInfo.imageLayout	= 0;
+
+	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.pNext				= NULL;
+	descriptorWrite.dstSet				= vk->core.descriptorSet;
+	descriptorWrite.dstBinding			= 2;
+	descriptorWrite.dstArrayElement		= 0;
+	descriptorWrite.descriptorCount		= 1;
+	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorWrite.pImageInfo			= &imageInfo;
+	descriptorWrite.pBufferInfo			= NULL;
+	descriptorWrite.pTexelBufferView	= NULL;
+	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
+}
+
+
+static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
+{	
+	VkWriteDescriptorSet			descriptorWrite[4];
+	VkDescriptorBufferInfo			writeBufferInfo[4];
+	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES];
+
+	if (kdo_loadTexture(vk, DEFAULT_TEXTURE))
+		kdo_cleanup(vk, "Defautl textures load failed", 34);
+
+	writeBufferInfo[0].buffer	= vk->core.buffer.object.buffer;
+	writeBufferInfo[0].offset	= 0;
+	writeBufferInfo[0].range	= vk->core.buffer.object.sizeFree;
+
+	writeBufferInfo[1].buffer	= vk->core.buffer.materialMap.buffer;
+	writeBufferInfo[1].offset	= 0;
+	writeBufferInfo[1].range	= vk->core.buffer.materialMap.sizeFree;
+
+	writeBufferInfo[2].buffer	= vk->core.buffer.light.buffer;
+	writeBufferInfo[2].offset	= 0;
+	writeBufferInfo[2].range	= vk->core.buffer.light.sizeFree;
+
+	writeBufferInfo[3].buffer	= vk->core.buffer.materials.buffer;
+	writeBufferInfo[3].offset	= 0;
+	writeBufferInfo[3].range	= vk->core.buffer.materials.sizeFree;
+
+		
+	descriptorWrite[0].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite[0].pNext               = NULL;
+	descriptorWrite[0].dstSet              = vk->core.descriptorSet;
+	descriptorWrite[0].dstBinding          = 0;
+	descriptorWrite[0].dstArrayElement     = 0;
+	descriptorWrite[0].descriptorCount     = 1;
+	descriptorWrite[0].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite[0].pImageInfo          = NULL;
+	descriptorWrite[0].pBufferInfo         = writeBufferInfo;
+	descriptorWrite[0].pTexelBufferView    = NULL;
+
+	descriptorWrite[1].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite[1].pNext               = NULL;
+	descriptorWrite[1].dstSet              = vk->core.descriptorSet;
+	descriptorWrite[1].dstBinding          = 1;
+	descriptorWrite[1].dstArrayElement     = 0;
+	descriptorWrite[1].descriptorCount     = 1;
+	descriptorWrite[1].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite[1].pImageInfo          = NULL;
+	descriptorWrite[1].pBufferInfo         = writeBufferInfo + 1;
+	descriptorWrite[1].pTexelBufferView    = NULL;
+
+	descriptorWrite[2].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite[2].pNext               = NULL;
+	descriptorWrite[2].dstSet              = vk->core.descriptorSet;
+	descriptorWrite[2].dstBinding          = 4;
+	descriptorWrite[2].dstArrayElement     = 0;
+	descriptorWrite[2].descriptorCount     = 1;
+	descriptorWrite[2].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite[2].pImageInfo          = NULL;
+	descriptorWrite[2].pBufferInfo         = writeBufferInfo + 2;
+	descriptorWrite[2].pTexelBufferView    = NULL;
+
+	descriptorWrite[3].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite[3].pNext               = NULL;
+	descriptorWrite[3].dstSet              = vk->core.descriptorSet;
+	descriptorWrite[3].dstBinding          = 5;
+	descriptorWrite[3].dstArrayElement     = 0;
+	descriptorWrite[3].descriptorCount     = 1;
+	descriptorWrite[3].descriptorType      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite[3].pImageInfo          = NULL;
+	descriptorWrite[3].pBufferInfo         = writeBufferInfo + 3;
+	descriptorWrite[3].pTexelBufferView    = NULL;
+	vkUpdateDescriptorSets(vk->device.path, 4, descriptorWrite, 0, NULL);
+
+
+	for (uint32_t i = 0; i < MAX_TEXTURES; i++)
+	{
+		writeImageInfo[i].sampler		= NULL;
+		writeImageInfo[i].imageView		= vk->core.buffer.textures.image[0].view;
+		writeImageInfo[i].imageLayout	= vk->core.buffer.textures.properties.layout;
+	}
+
+	descriptorWrite[0].sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite[0].pNext				= NULL;
+	descriptorWrite[0].dstSet				= vk->core.descriptorSet;
+	descriptorWrite[0].dstBinding			= 3;
+	descriptorWrite[0].dstArrayElement		= 0;
+	descriptorWrite[0].descriptorCount		= MAX_TEXTURES;
+	descriptorWrite[0].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descriptorWrite[0].pImageInfo			= writeImageInfo;
+	descriptorWrite[0].pBufferInfo			= NULL;
+	descriptorWrite[0].pTexelBufferView	= NULL;
+	vkUpdateDescriptorSets(vk->device.path, 1, descriptorWrite, 0, NULL);
 }
 
 void	kdo_initCore(Kdo_Vulkan *vk)
@@ -208,265 +325,121 @@ void	kdo_initCore(Kdo_Vulkan *vk)
 	commandPoolInfo.flags               = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	commandPoolInfo.queueFamilyIndex    = vk->device.queues[TRANSFER_QUEUE].familyIndex;
 	if (vkCreateCommandPool(vk->device.path, &commandPoolInfo, NULL, &vk->core.transferPool) != VK_SUCCESS)
-		kdo_cleanup(vk, "Transfer pool creation failed", 21);
 
-	vk->core.textures.properties.memoryFilter	= findTextureMemoryFiltrer(vk);
-    vk->core.textures.properties.layout			= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    vk->core.textures.properties.waitFlags		= WAIT_DEVICE;
-
-    vk->core.vertex.properties.usage			= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    vk->core.vertex.properties.waitFlags		= WAIT_DEVICE;
+		kdo_cleanup(vk, "Transfer pool creation failed", 33);
 	
-    vk->core.index.properties.usage				= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    vk->core.index.properties.waitFlags			= WAIT_DEVICE;
+	vk->core.buffer.textures		= kdo_newImageBuffer(vk, TEXTURE_BUFFER_SIZE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, findTextureMemoryFiltrer(vk), WAIT_DEVICE);
+	vk->core.buffer.vertex			= kdo_newBuffer(vk, VERTEX_BUFFER_SIZE, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, WAIT_DEVICE);
+	vk->core.buffer.index			= kdo_newBuffer(vk, INDEX_BUFFER_SIZE, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, WAIT_DEVICE);
+	vk->core.buffer.materials		= kdo_newBuffer(vk, MAX_MATERIAL * sizeof(Kdo_ShMaterial), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, WAIT_DEVICE);
+	vk->core.buffer.materialMap		= kdo_newBuffer(vk, MAX_MATERIAL_MAP * sizeof(uint32_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, WAIT_DEVICE);
+	vk->core.buffer.light			= kdo_newBuffer(vk, MAX_LIGHT * sizeof(Kdo_ShLight), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, WAIT_DEVICE);
+	vk->core.buffer.object			= kdo_newBuffer(vk, MAX_OBJECT * sizeof(Kdo_ShObjectMap), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, WAIT_DEVICE);
 
-	vk->core.materials.properties.usage			= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	vk->core.materials.properties.waitFlags		= WAIT_DEVICE;
-
-	vk->core.materialMap.properties.usage		= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	vk->core.materialMap.properties.waitFlags	= WAIT_DEVICE;
-
-	vk->core.light.properties.usage				= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	vk->core.light.properties.waitFlags			= WAIT_DEVICE;
-
-	vk->core.objectMap.properties.usage			= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	vk->core.objectMap.properties.waitFlags		= WAIT_DEVICE;
-
-	vk->core.drawCommand.properties.usage		= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-	vk->core.drawCommand.properties.waitFlags	= WAIT_DEVICE;
-
+	
 	kdo_initSampler(vk);	
 	kdo_initDescriptorPool(vk);
+	kdo_initDescriptorSets(vk);
 }
 
-void	kdo_loadMesh(Kdo_Vulkan *vk, uint32_t infoCount, Kdo_VkLoadMeshInfo *info)
+uint32_t	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_Vertex *vertexIn, uint32_t vertexInCount)
 {
-	Kdo_VkBuffer		stagingBuffer;
-	Kdo_VkLoadDataInfo	*vertexInfo;
-	Kdo_VkLoadDataInfo	*indexInfo;
-	uint32_t			*sortVertexIndex;
-	uint32_t			currentVertex;
-	uint32_t			sameVertex;
-	uint32_t			i;
-	uint32_t			j;
+	uint32_t	*indexOut;
+	uint32_t	vertexOutCount;
+	Kdo_Vertex	*vertexOut;
 
-	if (!(vertexInfo = malloc(infoCount * sizeof(Kdo_VkLoadDataInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);	
-	if (!(indexInfo = malloc(infoCount * sizeof(Kdo_VkLoadDataInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);	
+	vertexOutCount = kdo_splitMesh(vk, vertexIn, vertexInCount, &vertexOut, &indexOut);
+	kdo_setData(vk, &vk->core.buffer.vertex, vertexOut, vertexOutCount * sizeof(Kdo_Vertex), vk->core.buffer.vertex.sizeUsed);
+	kdo_setData(vk, &vk->core.buffer.index, indexOut, vertexInCount * sizeof(uint32_t), vk->core.buffer.index.sizeUsed);
 
-	for (i = 0; i < infoCount; i++)
-	{
-		indexInfo[i].count			= info[i].count;
-		indexInfo[i].elementSize	= sizeof(uint32_t);
-		if (!(indexInfo[i].data = malloc(indexInfo[i].count * indexInfo[i].elementSize)))
-			kdo_cleanup(vk, ERRLOC, 12);
+	free(vertexOut);
+	free(indexOut);
 
-		if (!(sortVertexIndex				= malloc(info[i].count * sizeof (uint32_t))))
-			kdo_cleanup(vk, ERRLOC, 12);
-		for (j = 0; j < info[i].count; j++)
-		{
-			((uint32_t *) indexInfo[i].data)[j] = j;
-			sortVertexIndex[j]					= j;
-		}
-
-		vertexInfo[i].count			= info[i].count - kdo_splitMesh(info[i].vertex, indexInfo[i].data, sortVertexIndex, info[i].count);
-		vertexInfo[i].elementSize	= sizeof(Kdo_Vertex);
-		if (!(vertexInfo[i].data = malloc(vertexInfo[i].count * vertexInfo[i].elementSize)))
-			kdo_cleanup(vk, ERRLOC, 12);
-
-		currentVertex	= 0;
-		sameVertex		= 0;
-		((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[sortVertexIndex[0]];
-		for (j = 0; j + 1 < info[i].count; j++)
-		{
-			if (kdo_vertexCmp(info[i].vertex[sortVertexIndex[j]], info[i].vertex[sortVertexIndex[j + 1]]))
-				((Kdo_Vertex *) vertexInfo[i].data)[currentVertex++] = info[i].vertex[sortVertexIndex[j + 1]];
-			else
-				sameVertex++;
-			((uint32_t *) indexInfo[i].data)[sortVertexIndex[j + 1]] -= sameVertex;
-		}
-		free(sortVertexIndex);
-	}
-
-	stagingBuffer	= kdo_loadData(vk, infoCount, vertexInfo);
-	vk->core.vertex	= kdo_catBuffer(vk, &vk->core.vertex, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	stagingBuffer	= kdo_loadData(vk, infoCount, indexInfo);
-	vk->core.index	= kdo_catBuffer(vk, &vk->core.index, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	for (i = 0; i < infoCount; i++)
-	{
-		free(indexInfo[i].data);
-		free(vertexInfo[i].data);
-	}
-	free(indexInfo);
-	free(vertexInfo);
+	return (vertexOutCount);
 }
 
-void	kdo_loadTextures(Kdo_Vulkan *vk, uint32_t texturesCount, char **texturesPath)
+uint32_t	kdo_loadTexture(Kdo_Vulkan *vk, char *texturePath)
 {
-	VkDescriptorImageInfo			*descriptorInfo;
-	VkWriteDescriptorSet			descriptorWrite;
-	Kdo_VkBuffer					stagingBuffer;
-	Kdo_VkLoadDataInfo				*loadInfo;
-	Kdo_VkCatBufferToImageInfo		catInfo;
-	int								texWidth;
-	int								texHeight;
-	int								texChannels;
-	uint32_t						i;
+	VkDescriptorImageInfo	writeImageInfo;
+	VkWriteDescriptorSet	descriptorWrite;
+	Kdo_VkImageFuncInfo		funcInfo = {kdo_imageTextureInfo, kdo_viewTextureInfo};
 
-	if (!(loadInfo		= malloc(texturesCount * sizeof(Kdo_VkLoadDataInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	if (!texturePath || kdo_appendImage(vk, &vk->core.buffer.textures, texturePath, funcInfo))
+		return (1);
 
-	catInfo.layout			= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	catInfo.func.imageInfo	= kdo_imageTextureInfo;
-	catInfo.func.viewInfo		= kdo_viewTextureInfo;
-	catInfo.imagesCount		= texturesCount;
-	if (!(catInfo.extents		= malloc(texturesCount * sizeof(Kdo_VkImageDiv))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	for (i = 0; i < texturesCount; i++)
-	{
-		if (!(loadInfo[i].data		= stbi_load(texturesPath[i], &texWidth, &texHeight, &texChannels, STBI_rgb_alpha)))
-			kdo_cleanup(vk, "Textures load failed", 27);
-
-		loadInfo[i].count		= texWidth * texHeight;
-		loadInfo[i].elementSize	= 4;
-
-		catInfo.extents[i].width	= texWidth;
-		catInfo.extents[i].height	= texHeight;
-		catInfo.extents[i].depth	= 1;
-	}
-
-	stagingBuffer		= kdo_loadData(vk, texturesCount, loadInfo);
-	vk->core.textures	= kdo_catBufferToImage(vk, &stagingBuffer, &vk->core.textures, catInfo);
-
-	if (!(descriptorInfo = malloc(texturesCount * sizeof(VkDescriptorImageInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	for (uint32_t i = 0; i < texturesCount; i++)
-	{
-		descriptorInfo[i].sampler			= NULL;
-		descriptorInfo[i].imageView			= vk->core.textures.div[vk->core.textures.divCount - texturesCount + i].view;
-		descriptorInfo[i].imageLayout		= vk->core.textures.properties.layout;
-	}
+	writeImageInfo.sampler				= NULL;
+	writeImageInfo.imageView			= vk->core.buffer.textures.image[vk->core.buffer.textures.imageCount - 1].view;
+	writeImageInfo.imageLayout			= vk->core.buffer.textures.properties.layout;
 
 	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrite.pNext				= NULL;
 	descriptorWrite.dstSet				= vk->core.descriptorSet;
 	descriptorWrite.dstBinding			= 3;
-	descriptorWrite.dstArrayElement		= vk->core.textures.divCount - texturesCount;
-	descriptorWrite.descriptorCount		= texturesCount;
+	descriptorWrite.dstArrayElement		= vk->core.buffer.textures.imageCount - 1;
+	descriptorWrite.descriptorCount		= 1;
 	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorWrite.pImageInfo			= descriptorInfo;
+	descriptorWrite.pImageInfo			= &writeImageInfo;
 	descriptorWrite.pBufferInfo			= NULL;
 	descriptorWrite.pTexelBufferView	= NULL;
 	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
 
-	free(descriptorInfo);
-	free(loadInfo);
-	free(catInfo.extents);
+	return (0);
 }
 
-void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info)
+void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info)
 {
-	Kdo_VkObjectDiv		*objectDiv;
-	Kdo_ShObjectMap     *objectMap;
-	uint32_t			*materialMap;
-	Kdo_VkLoadMeshInfo	*loadMeshInfo;
-	Kdo_VkLoadDataInfo	*loadObjectMapInfo;
-	Kdo_VkLoadDataInfo	*loadMaterialInfo;
-	Kdo_VkLoadDataInfo	*loadMaterialMapInfo;
-	Kdo_VkBuffer		stagingBuffer;
-	uint32_t			currentObject;
-	uint32_t			currentMaterial;
-	uint32_t			materialOffset;
-	uint32_t			materialCount;
+	Kdo_ShObjectMap	objectMap;
+	uint32_t		*materialMap;
 
-	materialCount = 0;
-	for (currentObject = 0; currentObject < objectCount; currentObject++)
-		materialCount += info[currentObject].materialCount;
-
-	if (!(objectDiv				= malloc(objectCount * sizeof(Kdo_VkObjectDiv))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(objectMap				= malloc(objectCount * sizeof(Kdo_ShObjectMap))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(loadObjectMapInfo		= malloc(objectCount * sizeof(Kdo_VkLoadMeshInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(loadMeshInfo			= malloc(objectCount * sizeof(Kdo_VkLoadMeshInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(loadMaterialInfo		= malloc(materialCount * sizeof(Kdo_VkLoadDataInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(loadMaterialMapInfo	= malloc(objectCount * sizeof(Kdo_VkLoadDataInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(materialMap			= malloc(materialCount * sizeof(uint32_t))))
+	if (!(materialMap = malloc(info.materialCount * sizeof(uint32_t))))
 		kdo_cleanup(vk, ERRLOC, 12);
 
-	materialOffset = 0;
-	if (0 < vk->core.objects.divCount)
-		materialOffset = vk->core.objects.div[vk->core.objects.divCount - 1].materialOffset;
-	for (currentObject = 0; currentObject < objectCount; currentObject++)
+	glm_mat4_identity(objectMap.modelMat);
+	glm_mat4_identity(objectMap.normalMat);
+	objectMap.materialOffset				= vk->core.count.materialMap;
+	objectMap.drawCommand.indexCount		= info.vertexCount;
+	objectMap.drawCommand.instanceCount		= 1;
+	objectMap.drawCommand.firstIndex		= vk->core.count.index;
+	objectMap.drawCommand.vertexOffset		= vk->core.count.vertex;
+	objectMap.drawCommand.firstInstance		= vk->core.count.object;
+	kdo_setData(vk, &vk->core.buffer.object, &objectMap, sizeof(Kdo_ShObjectMap), vk->core.buffer.object.sizeUsed);
+
+	for (uint32_t currentMaterial = 0; currentMaterial < info.materialCount; currentMaterial++)
 	{
-		for (currentMaterial = 0; currentMaterial < info[currentObject].materialCount; currentMaterial++)
-		{
-			loadMaterialInfo[materialOffset + currentMaterial].elementSize	= sizeof(Kdo_ShMaterial);
-			loadMaterialInfo[materialOffset + currentMaterial].count		= 1;
-			loadMaterialInfo[materialOffset + currentMaterial].data			= info[currentObject].material + currentMaterial;
-			materialMap[materialOffset + currentMaterial]	= vk->core.materialMap.divCount + materialOffset + currentMaterial;
-		}
-
-		loadMeshInfo[currentObject].count	= info[currentObject].vertexCount;
-		loadMeshInfo[currentObject].vertex	= info[currentObject].vertex;	
-
+		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Kd]))
+			info.material[currentMaterial].map_Kd	= 0;
+		else
+			info.material[currentMaterial].map_Kd	= vk->core.buffer.textures.imageCount - 1;
 		
-		loadMaterialMapInfo[currentObject].elementSize	= sizeof(uint32_t);
-		loadMaterialMapInfo[currentObject].count		= info[currentObject].materialCount;
-		loadMaterialMapInfo[currentObject].data			= materialMap + materialOffset; 
+		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Ns]))
+			info.material[currentMaterial].map_Ns	= 0;
+		else
+			info.material[currentMaterial].map_Ns	= vk->core.buffer.textures.imageCount - 1;
 
-		glm_mat4_identity(objectMap[currentObject].modelMat);
-		glm_mat4_identity(objectMap[currentObject].normalMat);
-		glm_rotate_make(objectMap[currentObject].modelMat, glm_rad(-90.0f), GLM_XUP);
-		glm_rotate_make(objectMap[currentObject].normalMat, glm_rad(-90.0f), GLM_XUP);
-		objectMap[currentObject].materialOffset    = materialOffset;
+		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Bump]))
+			info.material[currentMaterial].map_Bump	= 0;
+		else
+			info.material[currentMaterial].map_Bump	= vk->core.buffer.textures.imageCount - 1;
 
-		loadObjectMapInfo[currentObject].elementSize        = sizeof(Kdo_ShObjectMap);
-		loadObjectMapInfo[currentObject].count              = 1;
-        loadObjectMapInfo[currentObject].data               = objectMap + currentObject;
+		kdo_setData(vk, &vk->core.buffer.materials, &info.material[currentMaterial], sizeof(Kdo_ShMaterial), vk->core.buffer.materials.sizeUsed);
 
-		objectDiv[currentObject].name				= info[currentObject].name;
-		objectDiv[currentObject].meshIndex			= vk->core.index.divCount + currentObject;
-		objectDiv[currentObject].materialOffset		= vk->core.materialMap.divCount + materialOffset;
-		kdo_initTransform(&objectDiv[currentObject].transform);
-
-		materialOffset += info[currentObject].materialCount;
+		materialMap[currentMaterial] = vk->core.count.materialMap + currentMaterial;
 	}
-	kdo_loadMesh(vk, objectCount, loadMeshInfo);
+	kdo_setData(vk, &vk->core.buffer.materialMap, materialMap, info.materialCount * sizeof(uint32_t), vk->core.buffer.materialMap.sizeUsed);
 
-	stagingBuffer       = kdo_loadData(vk, objectCount, loadObjectMapInfo);
-	vk->core.objectMap  = kdo_catBuffer(vk, &vk->core.objectMap, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vk->core.count.vertex		+= kdo_loadMesh(vk, info.vertex, info.vertexCount);
+	vk->core.count.index		+= info.vertexCount;
+	vk->core.count.materialMap	+= info.materialCount;
+	vk->core.count.materials	+= info.materialCount;
+	vk->core.count.object		+= 1;
 
-	stagingBuffer = kdo_loadData(vk, materialCount, loadMaterialInfo);
-	vk->core.materials = kdo_catBuffer(vk, &vk->core.materials, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	for (uint32_t i = 0; i < info.textureCount; i++)
+		free(info.texturePath[i]);
 
-	stagingBuffer = kdo_loadData(vk, objectCount, loadMaterialMapInfo);
-	vk->core.materialMap = kdo_catBuffer(vk, &vk->core.materialMap, &stagingBuffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	vk->core.objects.div		= kdo_mallocMerge(vk->core.objects.divCount * sizeof(Kdo_VkObjectDiv), vk->core.objects.div, objectCount * sizeof(Kdo_VkObjectDiv), objectDiv);
-	vk->core.objects.divCount	+= objectCount;
-
-	for (currentObject = 0; currentObject < objectCount; currentObject++)
-	{
-		free(info[currentObject].vertex);
-		free(info[currentObject].material);
-	}
-	free(objectDiv);
-	free(objectMap);
-	free(loadObjectMapInfo);
-	free(loadMeshInfo);
-	free(loadMaterialInfo);
-	free(loadMaterialMapInfo);
-	free(materialMap);		
+	free(info.vertex);
+	free(info.material);
+	free(info.texturePath);
+	free(materialMap);
 }
 
 Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
@@ -485,10 +458,13 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 	objectInfo.vertexCount	*= 3;
 
 	objectInfo.materialCount	= mesh->material_count;
+	objectInfo.textureCount		= mesh->material_count * 3;
 
-	if (!(objectInfo.vertex		= malloc(objectInfo.vertexCount * sizeof(Kdo_Vertex))))
+	if (!(objectInfo.vertex			= malloc(objectInfo.vertexCount * sizeof(Kdo_Vertex))))
 		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(objectInfo.material	= malloc(objectInfo.materialCount * sizeof(Kdo_ShMaterial))))
+	if (!(objectInfo.material		= malloc(objectInfo.materialCount * sizeof(Kdo_ShMaterial))))
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (!(objectInfo.texturePath	= malloc(objectInfo.materialCount * 3 * sizeof(char *))))
 		kdo_cleanup(vk, ERRLOC, 12);
 
 	for (uint32_t currentMaterial  = 0; currentMaterial  < mesh->material_count; currentMaterial ++)
@@ -516,9 +492,33 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 		objectInfo.material[currentMaterial].d			= mesh->materials[currentMaterial].d;
 		objectInfo.material[currentMaterial].illum		= mesh->materials[currentMaterial].illum;
 
-		objectInfo.material[currentMaterial].map_Kd		= 0;
-		objectInfo.material[currentMaterial].map_Ns		= 0;
-		objectInfo.material[currentMaterial].map_Bump	= 0;
+		objectInfo.material[currentMaterial].map_Kd		= currentMaterial * 3;
+		objectInfo.material[currentMaterial].map_Ns		= currentMaterial * 3 + 1;
+		objectInfo.material[currentMaterial].map_Bump	= currentMaterial * 3 + 2;
+
+		if (mesh->materials[currentMaterial].map_Kd.path)
+		{
+			if (!(objectInfo.texturePath[currentMaterial * 3]		= strdup(mesh->materials[currentMaterial].map_Kd.path)))
+				kdo_cleanup(vk, ERRLOC, 12);
+		}
+		else
+			objectInfo.texturePath[currentMaterial * 3]				= NULL;
+
+		if (mesh->materials[currentMaterial].map_Ns.path)
+		{
+			if (!(objectInfo.texturePath[currentMaterial * 3 + 1]	= strdup(mesh->materials[currentMaterial].map_Ns.path)))
+				kdo_cleanup(vk, ERRLOC, 12);
+		}
+		else
+			objectInfo.texturePath[currentMaterial * 3 + 1]			= NULL;
+
+		if (mesh->materials[currentMaterial].map_bump.path)
+		{
+			if (!(objectInfo.texturePath[currentMaterial * 3 + 2]	= strdup(mesh->materials[currentMaterial].map_bump.path)))
+				kdo_cleanup(vk, ERRLOC, 12);
+		}
+		else
+			objectInfo.texturePath[currentMaterial * 3 + 2]			= NULL;
 	}
 
 	currentFaceVertex   = 0;
@@ -575,25 +575,4 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 
 	fast_obj_destroy(mesh);
 	return (objectInfo);
-}
-
-void	kdo_updateTransform(Kdo_VkTransform *transform, uint32_t count)
-{
-	mat4 translateMat;
-	mat4 rotationMat;
-	mat4 scaleMat;
-
-	for (uint32_t i = 0; i < count; i++)
-	{
-		glm_translate_to(GLM_MAT4_IDENTITY, transform[i].pos, translateMat);
-		glm_euler(transform[i].rot, rotationMat);
-		glm_scale_make(scaleMat, transform[i].scale);
-
-		glm_mat4_mulN((mat4 *[]){&translateMat, &rotationMat, &scaleMat}, 3, transform[i].modelMat);
-
-		scaleMat[0][0] = 1 / scaleMat[0][0];
-		scaleMat[1][1] = 1 / scaleMat[1][1];
-		scaleMat[2][2] = 1 / scaleMat[2][2];
-		glm_mat4_mul(rotationMat, scaleMat, transform[i].normalMat);
-	}
 }

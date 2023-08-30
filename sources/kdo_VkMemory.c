@@ -24,7 +24,7 @@ static void	kdo_allocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer)
 	bufferInfo.pNext					= NULL;
 	bufferInfo.flags					= 0;
 	bufferInfo.size						= buffer->sizeUsed + buffer->sizeFree;
-	bufferInfo.usage					= buffer->properties.usage;
+	bufferInfo.usage					= buffer->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	bufferInfo.sharingMode				= VK_SHARING_MODE_EXCLUSIVE;
 	bufferInfo.queueFamilyIndexCount	= 0;
 	bufferInfo.pQueueFamilyIndices		= NULL;
@@ -83,6 +83,8 @@ Kdo_VkBuffer	kdo_newBuffer(Kdo_Vulkan *vk, VkDeviceSize bufferSize, VkBufferUsag
 	buffer.properties.usage			= usage;
 	buffer.properties.memoryFlags	= memoryFlags;
 	buffer.properties.waitFlags		= waitFlags;
+	buffer.buffer					= NULL;
+	buffer.memory					= NULL;
 	buffer.sizeUsed					= 0;
 	buffer.sizeFree					= bufferSize;
 	if (bufferSize)
@@ -98,7 +100,7 @@ void	kdo_reallocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, VkDeviceSize new
 	if (newSize == bufferSrc->sizeUsed + bufferSrc->sizeFree)
 		return ;
 	
-	bufferDst.properties.usage			= bufferSrc->properties.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bufferDst.properties.usage			= bufferSrc->properties.usage;
 	bufferDst.properties.memoryFlags	= bufferSrc->properties.memoryFlags;
 	bufferDst.properties.waitFlags		= bufferSrc->properties.waitFlags;
 	bufferDst.sizeUsed					= kdo_minSize(bufferSrc->sizeUsed, newSize);
@@ -118,9 +120,6 @@ void	kdo_setData(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize 
 
 	if (dataSize == 0)
 		return ;
-	if (dataSize < 0 || buffer->sizeUsed < offset)
-		kdo_cleanup(vk, "Write GPU Buffer Error", 26);
-
 	bufferSize = kdo_maxSize(buffer->sizeUsed + buffer->sizeFree, offset + dataSize);
 	kdo_reallocBuffer(vk, buffer, bufferSize);
 	if (buffer->properties.memoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
@@ -142,8 +141,8 @@ void	kdo_getData(Kdo_Vulkan *vk, Kdo_VkBuffer *buffer, void *data, VkDeviceSize 
 
 	if (dataSize == 0)
 		return ;
-	if (dataSize < 0 || (buffer->sizeUsed + buffer->sizeFree) < (offset + dataSize))
-		kdo_cleanup(vk, "Read GPU Buffer Error", 27);
+	if ((buffer->sizeUsed + buffer->sizeFree) < (offset + dataSize))
+		kdo_cleanup(vk, "Read GPU Buffer Error", 26);
 
 	if (buffer->properties.memoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
 				kdo_readHostBuffer(vk, buffer, data, dataSize, offset);
@@ -166,27 +165,39 @@ static void	kdo_allocImageBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer)
 	allocInfo.allocationSize    = imageBuffer->sizeUsed + imageBuffer->sizeFree;
 	allocInfo.memoryTypeIndex   = kdo_findMemoryType(vk, imageBuffer->properties.memoryFilter, imageBuffer->properties.memoryFlags);
 	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &imageBuffer->memory) != VK_SUCCESS)
-		kdo_cleanup(vk, "Allocation image memory failed", 28);
+		kdo_cleanup(vk, "Allocation image memory failed", 27);
 }
 
 static void	kdo_appendNewImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer, VkExtent3D extent, Kdo_VkImageFuncInfo funcInfo)
 {
-	Kdo_VkImage				newImage;
+	VkImage					newImage;
+	VkImageView				newView;
 	VkImageCreateInfo		imageInfo;
 	VkImageViewCreateInfo   viewInfo;
 	VkMemoryRequirements    memRequirements;
+	VkDeviceSize			alignment;
 
 	(*funcInfo.imageInfo)(extent, &imageInfo);
-	vkCreateImage(vk->device.path, &imageInfo, NULL, &newImage.image);
+	vkCreateImage(vk->device.path, &imageInfo, NULL, &newImage);
+
+	vkGetImageMemoryRequirements(vk->device.path, newImage, &memRequirements);
+	alignment				= imageBuffer->sizeUsed % memRequirements.alignment;
+	imageBuffer->sizeUsed	+= alignment;
+	imageBuffer->sizeFree	-= alignment;
+
+	if (imageBuffer->sizeFree < memRequirements.size)
+		kdo_reallocImageBuffer(vk, imageBuffer, imageBuffer->sizeUsed + memRequirements.size, funcInfo);
+	vkBindImageMemory(vk->device.path, newImage, imageBuffer->memory, imageBuffer->sizeUsed); 
 	
-	(*funcInfo.viewInfo)(newImage.image, &viewInfo);
-	vkCreateImageView(vk->device.path, &viewInfo, NULL, &newImage.view);
+	(*funcInfo.viewInfo)(newImage, &viewInfo);
+	vkCreateImageView(vk->device.path, &viewInfo, NULL, &newView);
 
-	vkGetImageMemoryRequirements(vk->device.path, newImage.image, &memRequirements);
-	newImage.extent = extent;
-	newImage.size = memRequirements.size;
-
-	kdo_reallocMerge(imageBuffer->imageCount * sizeof(Kdo_VkImage), imageBuffer->image, sizeof(Kdo_VkImage), &newImage);
+	if (!(imageBuffer->image = realloc(imageBuffer->image, (imageBuffer->imageCount + 1) * sizeof(Kdo_VkImage))))
+		kdo_cleanup(vk, ERRLOC, 12);
+	imageBuffer->image[imageBuffer->imageCount].image	= newImage;
+	imageBuffer->image[imageBuffer->imageCount].view	= newView;
+	imageBuffer->image[imageBuffer->imageCount].extent	= extent;
+	imageBuffer->image[imageBuffer->imageCount].size	= memRequirements.size;
 }
 
 static void	kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
@@ -260,9 +271,6 @@ void	kdo_appendImageFromImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst,
 	VkImageCopy             copyInfo;	
 
 	kdo_appendNewImage(vk, imageBufferDst, imageBufferSrc->image[imageIndex].extent, funcInfo);
-	if (imageBufferDst->sizeFree < imageBufferDst->image[imageBufferDst->imageCount].size)
-		kdo_reallocImageBuffer(vk, imageBufferDst, imageBufferDst->sizeUsed + imageBufferDst->image[imageBufferDst->imageCount].size, funcInfo);
-	vkBindImageMemory(vk->device.path, imageBufferDst->image[imageBufferDst->imageCount].image, imageBufferDst->memory, imageBufferDst->sizeUsed); 
 
 	kdo_beginUniqueCommand(vk, &commandBuffer);
 
@@ -293,6 +301,7 @@ void	kdo_appendImageFromImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst,
 
 	imageBufferDst->sizeUsed += imageBufferDst->image[imageBufferDst->imageCount].size;
 	imageBufferDst->sizeFree -= imageBufferDst->image[imageBufferDst->imageCount].size;
+	imageBufferDst->imageCount++;
 }
 
 void	kdo_appendImageFromBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, Kdo_VkBuffer *bufferSrc, VkDeviceSize offset, VkExtent3D extent, Kdo_VkImageFuncInfo funcInfo)
@@ -301,9 +310,6 @@ void	kdo_appendImageFromBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst
 	VkBufferImageCopy       copyBufferInfo;
 
 	kdo_appendNewImage(vk, imageBufferDst, extent, funcInfo);
-	if (imageBufferDst->sizeFree < imageBufferDst->image[imageBufferDst->imageCount].size)
-		kdo_reallocImageBuffer(vk, imageBufferDst, imageBufferDst->sizeUsed + imageBufferDst->image[imageBufferDst->imageCount].size, funcInfo);
-	vkBindImageMemory(vk->device.path, imageBufferDst->image[imageBufferDst->imageCount].image, imageBufferDst->memory, imageBufferDst->sizeUsed); 
 
 	kdo_beginUniqueCommand(vk, &commandBuffer);
 
@@ -328,9 +334,10 @@ void	kdo_appendImageFromBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst
 
 	imageBufferDst->sizeUsed += imageBufferDst->image[imageBufferDst->imageCount].size;
 	imageBufferDst->sizeFree -= imageBufferDst->image[imageBufferDst->imageCount].size;
+	imageBufferDst->imageCount++;
 }
 
-void	kdo_appendImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, char *imagePath, Kdo_VkImageFuncInfo funcInfo)
+uint32_t	kdo_appendImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, char *imagePath, Kdo_VkImageFuncInfo funcInfo)
 {
 	Kdo_VkBuffer	stagingBuffer = kdo_newBuffer(vk, 0, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0);
 	VkExtent3D		extent;
@@ -339,9 +346,11 @@ void	kdo_appendImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferDst, char *im
 
 	extent.depth = 1;
 	if (!(data      = stbi_load(imagePath, (int *)&extent.width, (int *)&extent.height, &texChannels, STBI_rgb_alpha)))
-		kdo_cleanup(vk, "Image load failed", 29);
+		return (1);
 
 	kdo_setData(vk, &stagingBuffer, data, extent.width * extent.height * 4, 0);
 	kdo_appendImageFromBuffer(vk, imageBufferDst, &stagingBuffer, 0, extent, funcInfo);
 	kdo_freeBuffer(vk, &stagingBuffer);
+
+	return (0);
 }

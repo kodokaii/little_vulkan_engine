@@ -48,8 +48,6 @@ static void kdo_createShaderModule(Kdo_Vulkan *vk, Kdo_Shader *shader)
 static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 {
 	VkDescriptorSetLayoutBinding				descriptorSetBinding[6];
-	VkDescriptorBindingFlags                    bindingFlags[6];
-	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
 	VkDescriptorSetLayoutCreateInfo				descriptorSetInfo;
 	VkPushConstantRange							constantsRange;
 	VkPipelineLayoutCreateInfo					pipelineLayoutInfo;
@@ -59,50 +57,38 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 	descriptorSetBinding[0].descriptorCount		= 1;
 	descriptorSetBinding[0].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[0].pImmutableSamplers	= NULL;
-	bindingFlags[0]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
 	descriptorSetBinding[1].binding				= 1;
 	descriptorSetBinding[1].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorSetBinding[1].descriptorCount		= 1;
 	descriptorSetBinding[1].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[1].pImmutableSamplers	= NULL;
-	bindingFlags[1]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
 	descriptorSetBinding[2].binding				= 2;
 	descriptorSetBinding[2].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
 	descriptorSetBinding[2].descriptorCount		= 1;
 	descriptorSetBinding[2].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[2].pImmutableSamplers	= NULL;
-	bindingFlags[2]                             = 0;
 
 	descriptorSetBinding[3].binding				= 3;
 	descriptorSetBinding[3].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorSetBinding[3].descriptorCount		= 1;
+	descriptorSetBinding[3].descriptorCount		= MAX_TEXTURES;
 	descriptorSetBinding[3].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[3].pImmutableSamplers	= NULL;
-	bindingFlags[3]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
 	descriptorSetBinding[4].binding				= 4;
 	descriptorSetBinding[4].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorSetBinding[4].descriptorCount		= 1;
 	descriptorSetBinding[4].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
-	bindingFlags[4]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
 	descriptorSetBinding[5].binding				= 5;
 	descriptorSetBinding[5].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorSetBinding[5].descriptorCount		= 1;
 	descriptorSetBinding[5].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[5].pImmutableSamplers	= NULL;
-	bindingFlags[5]                             = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
-
-
-	bindingFlagsInfo.sType          = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-	bindingFlagsInfo.pNext          = NULL;
-    bindingFlagsInfo.bindingCount   = 6;
-    bindingFlagsInfo.pBindingFlags  = bindingFlags;
 
 	descriptorSetInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descriptorSetInfo.pNext			= &bindingFlagsInfo;
+	descriptorSetInfo.pNext			= NULL;
 	descriptorSetInfo.flags			= 0;
 	descriptorSetInfo.bindingCount	= 6;
 	descriptorSetInfo.pBindings		= descriptorSetBinding;

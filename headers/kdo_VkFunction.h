@@ -22,7 +22,6 @@ void			kdo_endUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer);
 void			kdo_imageTextureInfo(VkExtent3D extent, VkImageCreateInfo *imageInfo);
 void			kdo_viewTextureInfo(VkImage image, VkImageViewCreateInfo *viewInfo);
 uint32_t		findTextureMemoryFiltrer(Kdo_Vulkan *vk);
-void			*kdo_reallocMerge(size_t sizeDst, void *dst, size_t sizeSrc, void *src);
 VkDeviceSize    kdo_minSize(VkDeviceSize val1, VkDeviceSize val2);
 VkDeviceSize    kdo_maxSize(VkDeviceSize val1, VkDeviceSize val2);
 

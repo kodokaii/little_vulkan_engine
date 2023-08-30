@@ -23,23 +23,27 @@
 # include <stdio.h>
 # include <string.h>
 
-# define SZ_SHADER		2
+# define SZ_SHADER				2
 
-# define QUEUES_COUNT	3
-# define PRESENT_QUEUE  0
-# define GRAPHIC_QUEUE  1
-# define TRANSFER_QUEUE 2
+# define QUEUES_COUNT			3
+# define PRESENT_QUEUE			0
+# define GRAPHIC_QUEUE			1
+# define TRANSFER_QUEUE			2
 
-# define ERRLOC			"CPU Memory allocation error"
-# define FOR_NO_ERROR	-1
+#define MAX_LIGHT				8
+#define MAX_OBJECT				32
+#define MAX_TEXTURES			128
+#define MAX_MATERIAL			128
+#define MAX_MATERIAL_MAP		256
 
-#define MAX_LIGHT           8
-#define MAX_OBJECT          32
-#define MAX_TEXTURES        128
-#define MAX_MATERIAL        128
-#define MAX_MATERIAL_MAP    256
+#define	VERTEX_BUFFER_SIZE		201326592
+#define	INDEX_BUFFER_SIZE		33554432
 
-# define DEFAULT_TEXTURE	"textures/default.png"
+# define TEXTURE_BUFFER_SIZE	100000000
+# define DEFAULT_TEXTURE		"textures/default.png"
+
+# define ERRLOC					"CPU Memory allocation error"
+# define FOR_NO_ERROR			-1
 
 typedef enum Kdo_VkWait
 {
@@ -71,12 +75,12 @@ typedef struct Kdo_ShMaterial
 
 typedef struct Kdo_ShObjectMap
 {
-	mat4 modelMat;
-    mat4 normalMat;
-    uint materialOffset;
-    uint pad0;
-    uint pad1;
-    uint pad2;
+	mat4							modelMat;
+    mat4							normalMat;
+    uint							materialOffset;
+	VkDrawIndexedIndirectCommand	drawCommand;
+    uint							pad0;
+    uint							pad1;
 }	Kdo_ShObjectMap;
 
 typedef struct Kdo_ShLight
@@ -282,6 +286,27 @@ typedef	struct Kdo_VkImageBuffer
 	Kdo_VkImage				*image;
 }	Kdo_VkImageBuffer;
 
+typedef struct Kdo_VkBufferCore
+{
+	Kdo_VkBuffer		vertex;
+	Kdo_VkBuffer		index;
+	Kdo_VkBuffer		materialMap;
+	Kdo_VkBuffer		materials;
+	Kdo_VkBuffer		light;
+	Kdo_VkImageBuffer	textures;
+	Kdo_VkBuffer		object;
+}	Kdo_VkBufferCore;
+
+typedef struct Kdo_VkBufferCoreCount
+{
+	uint32_t	vertex;
+	uint32_t	index;
+	uint32_t	materialMap;
+	uint32_t	materials;
+	uint32_t	light;
+	uint32_t	object;
+}	Kdo_VkBufferCoreCount;
+
 typedef struct Kdo_VkSampler
 {
 	VkSampler	basic;
@@ -289,18 +314,12 @@ typedef struct Kdo_VkSampler
 
 typedef struct Kdo_VkCore
 {
-	VkCommandPool		transferPool;
-	VkDescriptorPool	descriptorPool;
-	VkDescriptorSet		descriptorSet;
-	Kdo_VkBuffer		vertex;
-	Kdo_VkBuffer		index;
-	Kdo_VkBuffer		objectMap;
-	Kdo_VkBuffer		materialMap;
-	Kdo_VkBuffer		materials;
-	Kdo_VkBuffer		light;
-	Kdo_VkImageBuffer	textures;
-	Kdo_VkSampler		sampler;
-	Kdo_VkBuffer		drawCommand;
+	VkCommandPool			transferPool;
+	VkDescriptorPool		descriptorPool;
+	VkDescriptorSet			descriptorSet;
+	Kdo_VkBufferCore		buffer;
+	Kdo_VkBufferCoreCount	count;
+	Kdo_VkSampler			sampler;
 }	Kdo_VkCore;
 
 typedef struct Kdo_VkRenderPool
@@ -331,6 +350,12 @@ typedef struct Kdo_VkCamera
 	float	pitch;
 } Kdo_VkCamera;
 
+typedef struct Kdo_VkCompute
+{
+	int		start;
+	double	time;
+}	Kdo_VkCompute;
+
 typedef struct Kdo_Vulkan
 {
 	Kdo_VkInitInfo			info;
@@ -348,6 +373,7 @@ typedef struct Kdo_Vulkan
 	Kdo_VkCore				core;
 	Kdo_VkDisplay			display;
 	Kdo_VkCamera			camera;
+	Kdo_VkCompute			compute;
 }	Kdo_Vulkan;
 
 # include "kdo_VkCleanup.h"

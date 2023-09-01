@@ -24,7 +24,7 @@ struct Material
     float       d;
     int         illum;
     uint        map_Kd;
-    uint        map_Ns;
+    uint        map_Ks;
     uint        map_Bump;
 };
 
@@ -77,8 +77,8 @@ void main() {
 	reflectDir		= reflect(-lightDir, inNormal);
 
 	ambient			= vec3(material.Ka) * ambientLight;
-	diffuse			= vec3(texture(sampler2D(tex[material.map_Kd], samp) , inTexCoord)) * vec3(material.Kd) * vec3(lightBuffer.light[0].color_stop) * max(dot(inNormal, lightDir), 0.0);
-	specular		= vec3(material.Ks) * vec3(lightBuffer.light[0].color_stop) * pow(max(dot(viewDir, reflectDir), 0.0), material.Ns);
+	diffuse			= vec3(texture(sampler2D(tex[material.map_Kd], samp), inTexCoord)) * vec3(material.Kd) * vec3(lightBuffer.light[0].color_stop) * max(dot(inNormal, lightDir), 0.0);
+	specular		= vec3(texture(sampler2D(tex[material.map_Ks], samp), inTexCoord)) * vec3(material.Ks) * vec3(lightBuffer.light[0].color_stop) * pow(max(dot(viewDir, reflectDir), 0.0), material.Ns);
 
 	outColor = vec4(ambient + diffuse + specular, 1);
 }

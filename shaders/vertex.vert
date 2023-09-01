@@ -35,7 +35,7 @@ layout(binding = 0) uniform ObjectBuffer
 
 layout(binding = 1) uniform MaterialMapBuffer
 {
-	uint		absMaterialIndex[MAX_MATERIAL_MAP];
+	ivec4		absMaterialIndex[MAX_MATERIAL_MAP / 4];
 } materialMapBuffer;
 
 layout(push_constant) uniform Push
@@ -46,10 +46,12 @@ layout(push_constant) uniform Push
 
 void main()
 { 
+	uint	materialMapIndex;
+
     gl_Position			= push.camera * objectBuffer.object[gl_InstanceIndex].modelMat * vec4(inPos, 1.0);
 	outPos				= vec3(objectBuffer.object[gl_InstanceIndex].modelMat * vec4(inPos, 1.0));
 	outNormal			= normalize(mat3(objectBuffer.object[gl_InstanceIndex].normalMat) * inNormal);
 	outTexCoord			= inTexCoord;
-	//outMaterialIndex	= materialMapBuffer.absMaterialIndex[objectBuffer.object[gl_InstanceIndex].materialOffset + inRelMaterialIndex];
-	outMaterialIndex = inRelMaterialIndex;
+	materialMapIndex	= objectBuffer.object[gl_InstanceIndex].materialOffset + inRelMaterialIndex;
+	outMaterialIndex	= materialMapBuffer.absMaterialIndex[materialMapIndex >> 2][materialMapIndex & 3];
 }

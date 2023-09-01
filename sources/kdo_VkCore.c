@@ -230,9 +230,6 @@ static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
 	VkDescriptorBufferInfo			writeBufferInfo[4];
 	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES];
 
-	if (kdo_loadTexture(vk, DEFAULT_TEXTURE))
-		kdo_cleanup(vk, "Defautl textures load failed", 34);
-
 	writeBufferInfo[0].buffer	= vk->core.buffer.object.buffer;
 	writeBufferInfo[0].offset	= 0;
 	writeBufferInfo[0].range	= vk->core.buffer.object.sizeFree;
@@ -295,6 +292,9 @@ static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
 	descriptorWrite[3].pTexelBufferView    = NULL;
 	vkUpdateDescriptorSets(vk->device.path, 4, descriptorWrite, 0, NULL);
 
+
+	if (kdo_loadTexture(vk, DEFAULT_TEXTURE))
+		kdo_cleanup(vk, "Defautl textures load failed", 34);
 
 	for (uint32_t i = 0; i < MAX_TEXTURES; i++)
 	{
@@ -411,10 +411,10 @@ void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info)
 		else
 			info.material[currentMaterial].map_Kd	= vk->core.buffer.textures.imageCount - 1;
 		
-		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Ns]))
-			info.material[currentMaterial].map_Ns	= 0;
+		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Ks]))
+			info.material[currentMaterial].map_Ks	= 0;
 		else
-			info.material[currentMaterial].map_Ns	= vk->core.buffer.textures.imageCount - 1;
+			info.material[currentMaterial].map_Ks	= vk->core.buffer.textures.imageCount - 1;
 
 		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Bump]))
 			info.material[currentMaterial].map_Bump	= 0;
@@ -493,7 +493,7 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 		objectInfo.material[currentMaterial].illum		= mesh->materials[currentMaterial].illum;
 
 		objectInfo.material[currentMaterial].map_Kd		= currentMaterial * 3;
-		objectInfo.material[currentMaterial].map_Ns		= currentMaterial * 3 + 1;
+		objectInfo.material[currentMaterial].map_Ks		= currentMaterial * 3 + 1;
 		objectInfo.material[currentMaterial].map_Bump	= currentMaterial * 3 + 2;
 
 		if (mesh->materials[currentMaterial].map_Kd.path)
@@ -504,9 +504,9 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 		else
 			objectInfo.texturePath[currentMaterial * 3]				= NULL;
 
-		if (mesh->materials[currentMaterial].map_Ns.path)
+		if (mesh->materials[currentMaterial].map_Ks.path)
 		{
-			if (!(objectInfo.texturePath[currentMaterial * 3 + 1]	= strdup(mesh->materials[currentMaterial].map_Ns.path)))
+			if (!(objectInfo.texturePath[currentMaterial * 3 + 1]	= strdup(mesh->materials[currentMaterial].map_Ks.path)))
 				kdo_cleanup(vk, ERRLOC, 12);
 		}
 		else

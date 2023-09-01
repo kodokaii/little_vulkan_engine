@@ -8,7 +8,6 @@
 /* ###    ### ########  #########   ########  ###    ### ###     ### ###########       */
 /*                        <kodokai.featheur@gmail.com>                                 */
 /* *********************************************************************************** */
-
 #include "kdo_VkCompute.h"
 
 static void	kdo_updateCamera(Kdo_Vulkan *vk)
@@ -78,16 +77,17 @@ void kdo_compute(Kdo_Vulkan *vk)
 	if (!vk->compute.start)
 	{
 		Kdo_ShLight			light = {{5.0f, 0.0f, -10.0f, 10.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
-		Kdo_VkObjectInfo	objectInfo = kdo_openObj(vk, "obj/aircraft/aircraft.obj");
+		Kdo_VkObjectInfo	objectInfo = kdo_openObj(vk, "obj/mclaren.obj");
 		mat4				mat[2] = {GLM_MAT4_IDENTITY_INIT, GLM_MAT4_IDENTITY_INIT};
 
 		kdo_loadObject(vk, objectInfo);
 
 		kdo_setData(vk, &vk->core.buffer.light, &light, sizeof(Kdo_ShLight), vk->core.buffer.light.sizeUsed);
+
 		glm_rotate_x(mat[0], glm_rad(-90), mat[0]);
 		glm_mat4_dup(mat[0], mat[1]);
-
 		kdo_setData(vk, &vk->core.buffer.object, mat, 2 * sizeof(mat4), 0);
+
 		
 		vk->compute.start = 1;
 	}

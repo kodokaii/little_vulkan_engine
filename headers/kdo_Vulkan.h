@@ -69,7 +69,7 @@ typedef struct Kdo_ShMaterial
     int         illum;
 
     uint        map_Kd;
-    uint        map_Ns;
+    uint        map_Ks;
     uint        map_Bump;
 }	Kdo_ShMaterial;
 

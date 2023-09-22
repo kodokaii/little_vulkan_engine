@@ -30,15 +30,13 @@
 # define GRAPHIC_QUEUE			1
 # define TRANSFER_QUEUE			2
 
-#define MAX_LIGHT				8
-#define MAX_OBJECT				32
-#define MAX_TEXTURES			128
-#define MAX_MATERIAL			128
-#define MAX_MATERIAL_MAP		256
+#define	VERTEX_BUFFER_SIZE		128
+#define	VECTOR3_BUFFER_SIZE		128
+#define	VECTOR2_BUFFER_SIZE		128
+#define	MATERIAL_BUFFER_SIZE	128
+#define	LIGHT_BUFFER_SIZE		128
 
-#define	VERTEX_BUFFER_SIZE		201326592
-#define	INDEX_BUFFER_SIZE		33554432
-
+#define MAX_TEXTURES			32
 # define TEXTURE_BUFFER_SIZE	100000000
 # define DEFAULT_TEXTURE		"textures/default.png"
 
@@ -57,31 +55,34 @@ typedef enum Kdo_VkStatus
 
 typedef struct Kdo_ShMaterial
 {
-	vec4        Ka;
-    vec4        Kd;
-    vec4        Ks;
-    vec4        Ke;
-    vec4        Kt;
-    vec4        Tf;
-    float       Ns;
-    float       Ni;
-    float       d;
-    int         illum;
-
-    uint        map_Kd;
-    uint        map_Ks;
-    uint        map_Bump;
+	vec3		ambient;
+    uint32_t	ambientMap;
+    vec3		diffuse;
+    uint32_t	diffuseMap;
+    vec3		specular;
+    uint32_t	specularMap;
+    vec3		emissive;
+    uint32_t	emissiveMap;
+    vec3		transmittance;
+    uint32_t	transmittanceMap;
+    vec3		transmissionFilter;
+    uint32_t	transmissionFilterMap;
+	float		shininess;
+    uint32_t	shininessMap;
+    float		refractionIndex;
+    uint32_t	refractionMap;
+    float		disolve;
+    uint32_t	disolveMap;
+    int			illum;
+    uint32_t	bumpMap;
 }	Kdo_ShMaterial;
 
-typedef struct Kdo_ShObjectMap
+typedef struct Kdo_ShObject
 {
 	mat4							modelMat;
     mat4							normalMat;
-    uint							materialOffset;
-	VkDrawIndexedIndirectCommand	drawCommand;
-    uint							pad0;
-    uint							pad1;
-}	Kdo_ShObjectMap;
+	VkDrawIndirectCommand			drawCommand;
+}	Kdo_ShObject;
 
 typedef struct Kdo_ShLight
 {
@@ -95,13 +96,15 @@ typedef struct Kdo_VkPush
 	vec4	cameraPos;
 }	Kdo_VkPush;
 
-typedef struct Kdo_Vertex
+typedef struct Kdo_VkVertex
 {
-    vec3		pos;
-	vec3		normal;
-	vec2		tex;
-	uint32_t	relMaterialIndex;
-}	Kdo_Vertex;
+	uint32_t	posIndex;
+	uint32_t	tangentIndex;
+	uint32_t	bitangentIndex;
+	uint32_t	normalIndex;
+	uint32_t	uvIndex;
+	uint32_t	mtlIndex;
+}	Kdo_VkVertex;
 
 typedef struct Kdo_Shader
 {
@@ -286,23 +289,37 @@ typedef	struct Kdo_VkImageBuffer
 	Kdo_VkImage				*image;
 }	Kdo_VkImageBuffer;
 
+typedef	struct Kdo_VkBufferCoreElement
+{
+	Kdo_VkBuffer	path;
+	uint32_t		count;
+	uint32_t		*sort;
+}	Kdo_VkBufferCoreElement;
+
+typedef	struct Kdo_VkImageCoreElement
+{
+	Kdo_VkImageBuffer	path;
+	char				**name;
+	uint32_t			*sort;
+}	Kdo_VkImageCoreElement;
+
 typedef struct Kdo_VkBufferCore
 {
-	Kdo_VkBuffer		vertex;
-	Kdo_VkBuffer		index;
-	Kdo_VkBuffer		materialMap;
-	Kdo_VkBuffer		materials;
-	Kdo_VkBuffer		light;
-	Kdo_VkImageBuffer	textures;
-	Kdo_VkBuffer		object;
+	Kdo_VkBufferCoreElement		vertex;
+	Kdo_VkBufferCoreElement		vector3;
+	Kdo_VkBufferCoreElement		vector2;
+	Kdo_VkBufferCoreElement		material;
+	Kdo_VkBufferCoreElement		light;
+	Kdo_VkImageCoreElement		texture;
+	Kdo_VkBufferCoreElement		object;
 }	Kdo_VkBufferCore;
 
 typedef struct Kdo_VkBufferCoreCount
 {
 	uint32_t	vertex;
-	uint32_t	index;
-	uint32_t	materialMap;
-	uint32_t	materials;
+	uint32_t	vector3;
+	uint32_t	vector2;
+	uint32_t	material;
 	uint32_t	light;
 	uint32_t	object;
 }	Kdo_VkBufferCoreCount;
@@ -318,7 +335,6 @@ typedef struct Kdo_VkCore
 	VkDescriptorPool		descriptorPool;
 	VkDescriptorSet			descriptorSet;
 	Kdo_VkBufferCore		buffer;
-	Kdo_VkBufferCoreCount	count;
 	Kdo_VkSampler			sampler;
 }	Kdo_VkCore;
 
@@ -352,8 +368,10 @@ typedef struct Kdo_VkCamera
 
 typedef struct Kdo_VkCompute
 {
-	int		start;
-	double	time;
+	int		fps;
+	double	startTime;
+	double	currentTime;
+	double	secondTime;
 }	Kdo_VkCompute;
 
 typedef struct Kdo_Vulkan

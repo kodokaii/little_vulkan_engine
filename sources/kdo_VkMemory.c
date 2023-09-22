@@ -104,7 +104,7 @@ void	kdo_reallocBuffer(Kdo_Vulkan *vk, Kdo_VkBuffer *bufferSrc, VkDeviceSize new
 	bufferDst.properties.memoryFlags	= bufferSrc->properties.memoryFlags;
 	bufferDst.properties.waitFlags		= bufferSrc->properties.waitFlags;
 	bufferDst.sizeUsed					= kdo_minSize(bufferSrc->sizeUsed, newSize);
-	bufferDst.sizeFree					= newSize - bufferDst.sizeUsed; 
+	bufferDst.sizeFree					= newSize - bufferDst.sizeUsed;
 	kdo_allocBuffer(vk, &bufferDst);
 
 	kdo_cpyBuffer(vk, &bufferDst, bufferSrc, 0, 0, bufferDst.sizeUsed); 
@@ -182,12 +182,10 @@ static void	kdo_appendNewImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer, V
 
 	vkGetImageMemoryRequirements(vk->device.path, newImage, &memRequirements);
 	alignment				= imageBuffer->sizeUsed % memRequirements.alignment;
-	imageBuffer->sizeUsed	+= alignment;
-	imageBuffer->sizeFree	-= alignment;
 
-	if (imageBuffer->sizeFree < memRequirements.size)
-		kdo_reallocImageBuffer(vk, imageBuffer, imageBuffer->sizeUsed + memRequirements.size, funcInfo);
-	vkBindImageMemory(vk->device.path, newImage, imageBuffer->memory, imageBuffer->sizeUsed); 
+	if (imageBuffer->sizeFree < alignment + memRequirements.size)
+		kdo_reallocImageBuffer(vk, imageBuffer, imageBuffer->sizeUsed + alignment + memRequirements.size, funcInfo);
+	vkBindImageMemory(vk->device.path, newImage, imageBuffer->memory, imageBuffer->sizeUsed + alignment); 
 	
 	(*funcInfo.viewInfo)(newImage, &viewInfo);
 	vkCreateImageView(vk->device.path, &viewInfo, NULL, &newView);
@@ -198,6 +196,9 @@ static void	kdo_appendNewImage(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBuffer, V
 	imageBuffer->image[imageBuffer->imageCount].view	= newView;
 	imageBuffer->image[imageBuffer->imageCount].extent	= extent;
 	imageBuffer->image[imageBuffer->imageCount].size	= memRequirements.size;
+
+	imageBuffer->sizeUsed	+= alignment;
+	imageBuffer->sizeFree	-= alignment;
 }
 
 static void	kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
@@ -250,15 +251,17 @@ void	kdo_reallocImageBuffer(Kdo_Vulkan *vk, Kdo_VkImageBuffer *imageBufferSrc, V
 	if (newSize == imageBufferSrc->sizeUsed + imageBufferSrc->sizeFree)
 		return ;
 	
-	imageBufferDst.properties.layout		= VK_IMAGE_LAYOUT_UNDEFINED;
+	imageBufferDst.properties.layout		= imageBufferSrc->properties.layout;
 	imageBufferDst.properties.memoryFlags	= imageBufferSrc->properties.memoryFlags;
 	imageBufferDst.properties.memoryFilter	= imageBufferSrc->properties.memoryFilter;
 	imageBufferDst.properties.waitFlags		= imageBufferSrc->properties.waitFlags;
-	imageBufferDst.sizeUsed					= kdo_minSize(imageBufferSrc->sizeUsed, newSize);
-	imageBufferDst.sizeFree					= newSize - imageBufferDst.sizeUsed; 
+	imageBufferDst.sizeUsed					= 0;
+	imageBufferDst.sizeFree					= newSize; 
+	imageBufferDst.imageCount				= 0;
+	imageBufferDst.image					= NULL;
 	kdo_allocImageBuffer(vk, &imageBufferDst);
 
-	for (uint32_t i = 0; i < imageBufferSrc->imageCount && imageBufferSrc->image[i].size <= imageBufferSrc->sizeFree; i++)
+	for (uint32_t i = 0; i < imageBufferSrc->imageCount; i++)
 		kdo_appendImageFromImage(vk, &imageBufferDst, imageBufferSrc, i, funcInfo);
 	
 	kdo_freeImageBuffer(vk, imageBufferSrc);

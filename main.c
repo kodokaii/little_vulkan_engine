@@ -57,7 +57,7 @@ int	main(int argc, char *argv[])
 	vk.info.queuesInfo[TRANSFER_QUEUE].noPreferredFlags	= 0;
 	vk.info.queuesInfo[TRANSFER_QUEUE].presentSupport	= 0;
 
-	vk.info.presentMode							= VK_PRESENT_MODE_MAILBOX_KHR; 
+	vk.info.presentMode							= VK_PRESENT_MODE_MAILBOX_KHR;
 	vk.info.startPos[0]							= -2.0f;
 	vk.info.startPos[1]							= -1.0f;
 	vk.info.startPos[2]							= -1.0f;

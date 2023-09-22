@@ -117,6 +117,7 @@ void    kdo_initDevice(Kdo_Vulkan *vk)
 	float										queuePriority[QUEUES_COUNT];
 
 	deviceFeatures.samplerAnisotropy	= VK_TRUE;
+	deviceFeatures.multiDrawIndirect	= VK_TRUE;
 
 	deviceInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceInfo.pNext					= NULL;

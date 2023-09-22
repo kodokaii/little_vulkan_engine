@@ -1,42 +1,30 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
 
-#define MAX_OBJECT			32
-#define MAX_MATERIAL_MAP	256
-
-struct ObjectMap
+struct Object
 {
     mat4	modelMat;
     mat4	normalMat;
-	uint	materialOffset;
-	uint	indexCount;
+	uint	vertexCount;
 	uint	instanceCount;
-	uint	firstIndex;
-	int		vertexOffset;
+	uint	firstVertex;
 	uint	firstInstance;
-	uint	pad0;
-	uint	pad1;
 };
 
-layout(location = 0) in vec3 inPos;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec2 inTexCoord;
-layout(location = 3) in uint inRelMaterialIndex;
-
-layout(location = 0) out vec3	outPos;
-layout(location = 1) out vec3	outNormal;
-layout(location = 2) out vec2	outTexCoord;
-layout(location = 3) out uint	outMaterialIndex;
-
-layout(binding = 0) uniform ObjectBuffer
+layout(std430, binding = 0) readonly buffer ObjectBuffer
 {
-    ObjectMap	object[MAX_OBJECT];
+    Object	objectArray[];
 } objectBuffer;
 
-layout(binding = 1) uniform MaterialMapBuffer
+layout(std430, binding = 1) readonly buffer Vector3Buffer
 {
-	ivec4		absMaterialIndex[MAX_MATERIAL_MAP / 4];
-} materialMapBuffer;
+	vec3	vec3Array[];	
+} vector3Buffer;
+
+layout(std430, binding = 2) readonly buffer Vector2Buffer
+{
+	vec2	vec2Array[];	
+} vector2Buffer;
 
 layout(push_constant) uniform Push
 {
@@ -44,14 +32,36 @@ layout(push_constant) uniform Push
 	vec4	cameraPos;
 } push;
 
+
+layout(location = 0) in uint	inPosIndex;
+layout(location = 1) in uint	inTangentIndex;
+layout(location = 2) in uint	inBitangentIndex;
+layout(location = 3) in uint	inNormalIndex;
+layout(location = 4) in uint	inUVIndex;
+layout(location = 5) in uint	inMtlIndex;
+
+layout(location = 0) out vec3	outPos;
+layout(location = 1) out vec3	outTangent;
+layout(location = 2) out vec3	outBitangent;
+layout(location = 3) out vec3	outNormal;
+layout(location = 4) out vec2	outUV;
+layout(location = 5) out uint	outMtlIndex;
+
 void main()
 { 
-	uint	materialMapIndex;
-
-    gl_Position			= push.camera * objectBuffer.object[gl_InstanceIndex].modelMat * vec4(inPos, 1.0);
-	outPos				= vec3(objectBuffer.object[gl_InstanceIndex].modelMat * vec4(inPos, 1.0));
-	outNormal			= normalize(mat3(objectBuffer.object[gl_InstanceIndex].normalMat) * inNormal);
-	outTexCoord			= inTexCoord;
-	materialMapIndex	= objectBuffer.object[gl_InstanceIndex].materialOffset + inRelMaterialIndex;
-	outMaterialIndex	= materialMapBuffer.absMaterialIndex[materialMapIndex >> 2][materialMapIndex & 3];
+	mat4	inModelMat	= objectBuffer.objectArray[gl_BaseInstance].modelMat;
+	mat4	inNormalMat	= objectBuffer.objectArray[gl_BaseInstance].normalMat;
+	vec3	inPos		= vector3Buffer.vec3Array[inPosIndex];
+	vec3	inTangent	= vector3Buffer.vec3Array[inTangentIndex];
+	vec3	inBitangent	= vector3Buffer.vec3Array[inBitangentIndex];
+	vec3	inNormal	= vector3Buffer.vec3Array[inNormalIndex];
+	vec2	inUV		= vector2Buffer.vec2Array[inUVIndex];
+	
+    gl_Position			= push.camera * inModelMat * vec4(inPos, 1);
+	outPos				= mat3(inModelMat) * inPos;
+	outTangent			= normalize(mat3(inNormalMat) * inTangent);
+	outBitangent		= normalize(mat3(inNormalMat) * inBitangent);
+	outNormal			= normalize(mat3(inNormalMat) * inNormal);
+	outUV				= inUV;
+	outMtlIndex			= inMtlIndex;
 }

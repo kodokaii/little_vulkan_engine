@@ -14,33 +14,6 @@
 #define FAST_OBJ_IMPLEMENTATION
 #include "objLoader/fast_obj.h"
 
-static float	kdo_vec2Cmp(const vec2 vecteur1, const vec2 vecteur2)
-{
-	if (vecteur1[0] != vecteur2[0])
-		return (vecteur1[0] - vecteur2[0]);
-	return (vecteur1[1] - vecteur2[1]);
-}
-
-static float	kdo_vec3Cmp(const vec3 vecteur1, const vec3 vecteur2)
-{
-	if (vecteur1[0] != vecteur2[0])
-		return (vecteur1[0] - vecteur2[0]);
-	if (vecteur1[1] != vecteur2[1])
-		return (vecteur1[1] - vecteur2[1]);
-	return (vecteur1[2] - vecteur2[2]);
-}
-
-static float	kdo_vertexCmp(const Kdo_Vertex vertex1, const Kdo_Vertex vertex2)
-{
-	float	res;
-	
-	if ((res = kdo_vec3Cmp(vertex1.pos, vertex2.pos)))
-		return (res);
-	if ((res = kdo_vec3Cmp(vertex1.normal, vertex2.normal)))
-		return (res);
-	return (kdo_vec2Cmp(vertex1.tex, vertex2.tex));
-}
-
 static uint32_t	kdo_sortMesh(Kdo_Vertex *vertex, uint32_t toSortCount, uint32_t *sortIndex, uint32_t *index)
 {
 	uint32_t	beforeCount	= 0;
@@ -128,14 +101,14 @@ static uint32_t	kdo_splitMesh(Kdo_Vulkan *vk, Kdo_Vertex *vertexIn, uint32_t ver
 	return (vertexOutCount);
 }
 
-static void kdo_findNormal(vec3 vecteur1, vec3 vecteur2, vec3 vecteur3, vec3 *normal)
+static void kdo_findNormal(vec3 vertice1, vec3 vertice2, vec3 vertice3, vec3 *normal)
 {
 	vec3	x;
 	vec3	y;
 
-	glm_vec3_sub(vecteur2, vecteur3, x);
-	glm_vec3_sub(vecteur2, vecteur1, y);
-	glm_vec3_crossn(x, y, *normal);
+	glm_vec3_sub(vertice2, vertice3, x);
+	glm_vec3_sub(vertice2, vertice1, y);
+	glm_vec3_cross(x, y, *normal);
 }
 
 static void	kdo_initSampler(Kdo_Vulkan *vk) {
@@ -223,12 +196,38 @@ static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
 	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
 }
 
+static void	kdo_updateAllTextureDescriptor(Kdo_Vulkan *vk)
+{
+	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES];
+	VkWriteDescriptorSet			descriptorWrite;
+
+	for (uint32_t i = 0; i < MAX_TEXTURES; i++)
+	{
+		writeImageInfo[i].sampler		= NULL;
+		if (i < vk->core.buffer.textures.imageCount)
+			writeImageInfo[i].imageView		= vk->core.buffer.textures.image[i].view;
+		else
+			writeImageInfo[i].imageView		= vk->core.buffer.textures.image[0].view;
+		writeImageInfo[i].imageLayout	= vk->core.buffer.textures.properties.layout;
+	}
+
+	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.pNext				= NULL;
+	descriptorWrite.dstSet				= vk->core.descriptorSet;
+	descriptorWrite.dstBinding			= 3;
+	descriptorWrite.dstArrayElement		= 0;
+	descriptorWrite.descriptorCount		= MAX_TEXTURES;
+	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descriptorWrite.pImageInfo			= writeImageInfo;
+	descriptorWrite.pBufferInfo			= NULL;
+	descriptorWrite.pTexelBufferView	= NULL;
+	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
+}
 
 static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
 {	
 	VkWriteDescriptorSet			descriptorWrite[4];
 	VkDescriptorBufferInfo			writeBufferInfo[4];
-	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES];
 
 	writeBufferInfo[0].buffer	= vk->core.buffer.object.buffer;
 	writeBufferInfo[0].offset	= 0;
@@ -296,24 +295,7 @@ static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
 	if (kdo_loadTexture(vk, DEFAULT_TEXTURE))
 		kdo_cleanup(vk, "Defautl textures load failed", 34);
 
-	for (uint32_t i = 0; i < MAX_TEXTURES; i++)
-	{
-		writeImageInfo[i].sampler		= NULL;
-		writeImageInfo[i].imageView		= vk->core.buffer.textures.image[0].view;
-		writeImageInfo[i].imageLayout	= vk->core.buffer.textures.properties.layout;
-	}
-
-	descriptorWrite[0].sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite[0].pNext				= NULL;
-	descriptorWrite[0].dstSet				= vk->core.descriptorSet;
-	descriptorWrite[0].dstBinding			= 3;
-	descriptorWrite[0].dstArrayElement		= 0;
-	descriptorWrite[0].descriptorCount		= MAX_TEXTURES;
-	descriptorWrite[0].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorWrite[0].pImageInfo			= writeImageInfo;
-	descriptorWrite[0].pBufferInfo			= NULL;
-	descriptorWrite[0].pTexelBufferView	= NULL;
-	vkUpdateDescriptorSets(vk->device.path, 1, descriptorWrite, 0, NULL);
+	kdo_updateAllTextureDescriptor(vk);
 }
 
 void	kdo_initCore(Kdo_Vulkan *vk)
@@ -362,26 +344,33 @@ uint32_t	kdo_loadTexture(Kdo_Vulkan *vk, char *texturePath)
 {
 	VkDescriptorImageInfo	writeImageInfo;
 	VkWriteDescriptorSet	descriptorWrite;
+	VkDeviceSize			oldSize;
 	Kdo_VkImageFuncInfo		funcInfo = {kdo_imageTextureInfo, kdo_viewTextureInfo};
 
+	oldSize = vk->core.buffer.textures.sizeFree + vk->core.buffer.textures.sizeUsed;
 	if (!texturePath || kdo_appendImage(vk, &vk->core.buffer.textures, texturePath, funcInfo))
 		return (1);
 
-	writeImageInfo.sampler				= NULL;
-	writeImageInfo.imageView			= vk->core.buffer.textures.image[vk->core.buffer.textures.imageCount - 1].view;
-	writeImageInfo.imageLayout			= vk->core.buffer.textures.properties.layout;
+	if (oldSize != vk->core.buffer.textures.sizeFree + vk->core.buffer.textures.sizeUsed)
+		kdo_updateAllTextureDescriptor(vk);
+	else
+	{
+		writeImageInfo.sampler				= NULL;
+		writeImageInfo.imageView			= vk->core.buffer.textures.image[vk->core.buffer.textures.imageCount - 1].view;
+		writeImageInfo.imageLayout			= vk->core.buffer.textures.properties.layout;
 
-	descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.pNext				= NULL;
-	descriptorWrite.dstSet				= vk->core.descriptorSet;
-	descriptorWrite.dstBinding			= 3;
-	descriptorWrite.dstArrayElement		= vk->core.buffer.textures.imageCount - 1;
-	descriptorWrite.descriptorCount		= 1;
-	descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorWrite.pImageInfo			= &writeImageInfo;
-	descriptorWrite.pBufferInfo			= NULL;
-	descriptorWrite.pTexelBufferView	= NULL;
-	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
+		descriptorWrite.sType				= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.pNext				= NULL;
+		descriptorWrite.dstSet				= vk->core.descriptorSet;
+		descriptorWrite.dstBinding			= 3;
+		descriptorWrite.dstArrayElement		= vk->core.buffer.textures.imageCount - 1;
+		descriptorWrite.descriptorCount		= 1;
+		descriptorWrite.descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		descriptorWrite.pImageInfo			= &writeImageInfo;
+		descriptorWrite.pBufferInfo			= NULL;
+		descriptorWrite.pTexelBufferView	= NULL;
+		vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
+	}
 
 	return (0);
 }
@@ -451,126 +440,90 @@ Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)
 	uint32_t			currentVertex;
 	uint32_t			vertexOffset;
 
+
+	mesh = fast_obj_read(objPath);
+	
+	if (mesh->material_count)
+	{
+		objectInfo.materialCount	= mesh->material_count;
+		objectInfo.textureCount		= mesh->material_count * 3;
+
+		if (!(objectInfo.material		= malloc(objectInfo.materialCount * sizeof(Kdo_ShMaterial))))
+			kdo_cleanup(vk, ERRLOC, 12);
+		if (!(objectInfo.texturePath	= calloc(objectInfo.textureCount, sizeof(char *))))
+			kdo_cleanup(vk, ERRLOC, 12);
+
+		for (uint32_t currentMaterial  = 0; currentMaterial  < mesh->material_count; currentMaterial ++)
+		{
+			glm_vec3_make(mesh->materials[currentMaterial].Ka, objectInfo.material[currentMaterial].ambient);
+			glm_vec3_make(mesh->materials[currentMaterial].Kd, objectInfo.material[currentMaterial].diffuse);
+			glm_vec3_make(mesh->materials[currentMaterial].Ks, objectInfo.material[currentMaterial].specular);
+			glm_vec3_make(mesh->materials[currentMaterial].Ke, objectInfo.material[currentMaterial].emissive);
+			glm_vec3_make(mesh->materials[currentMaterial].Kt, objectInfo.material[currentMaterial].transmittance);
+			glm_vec3_make(mesh->materials[currentMaterial].Tf, objectInfo.material[currentMaterial].transmissionFilter);
+			objectInfo.material[currentMaterial].shininess			= mesh->materials[currentMaterial].Ns;
+			objectInfo.material[currentMaterial].refractionIndex	= mesh->materials[currentMaterial].Ni;
+			objectInfo.material[currentMaterial].disolve			= mesh->materials[currentMaterial].d;
+			objectInfo.material[currentMaterial].illum				= mesh->materials[currentMaterial].illum;
+
+			objectInfo.material[currentMaterial].diffuseMap		= currentMaterial * 3;
+			objectInfo.material[currentMaterial].specularMap	= currentMaterial * 3 + 1;
+			objectInfo.material[currentMaterial].bumpMap		= currentMaterial * 3 + 2;
+
+			if (mesh->materials[currentMaterial].map_Kd.path)
+				if (!(objectInfo.texturePath[currentMaterial * 3]		= strdup(mesh->materials[currentMaterial].map_Kd.path)))
+					kdo_cleanup(vk, ERRLOC, 12);
+
+			if (mesh->materials[currentMaterial].map_Ks.path)
+				if (!(objectInfo.texturePath[currentMaterial * 3 + 1]	= strdup(mesh->materials[currentMaterial].map_Ks.path)))
+					kdo_cleanup(vk, ERRLOC, 12);
+
+			if (mesh->materials[currentMaterial].map_bump.path)
+				if (!(objectInfo.texturePath[currentMaterial * 3 + 2]	= strdup(mesh->materials[currentMaterial].map_bump.path)))
+					kdo_cleanup(vk, ERRLOC, 12);
+		}
+	}
+	else
+	{
+		objectInfo.materialCount	= 1;
+		objectInfo.textureCount		= 1;
+
+		if (!(objectInfo.texturePath	= malloc(sizeof(Kdo_ShMaterial))))
+			kdo_cleanup(vk, ERRLOC, 12);
+		if (!(objectInfo.material		= malloc(sizeof(Kdo_ShMaterial))))
+			kdo_cleanup(vk, ERRLOC, 12);
+
+		glm_vec3_broadcast(0, objectInfo.material[0].ambient);
+		glm_vec3_broadcast(1, objectInfo.material[0].diffuse);
+		glm_vec3_broadcast(1, objectInfo.material[0].specular);
+		glm_vec3_broadcast(1, objectInfo.material[0].emissive);
+		glm_vec3_broadcast(1, objectInfo.material[0].transmittance);
+		glm_vec3_broadcast(1, objectInfo.material[0].transmissionFilter);
+		objectInfo.material[0].shininess		= 400;
+		objectInfo.material[0].refractionIndex	= 1;
+		objectInfo.material[0].disolve			= 1;
+		objectInfo.material[0].illum			= 0;
+
+		objectInfo.material[0].diffuseMap		= 0;
+		objectInfo.material[0].specularMap		= 0;
+		objectInfo.material[0].bumpMap			= 0;
+
+		objectInfo.texturePath[0] = NULL;
+	}
+
+
+	currentFaceVertex		= 0;
+	currentVertex			= 0;
 	objectInfo.vertexCount	= 0;
-	mesh					= fast_obj_read(objPath);
-	for (currentFace= 0; currentFace < mesh->face_count; currentFace++)
+	for (currentFace = 0; currentFace < mesh->face_count; currentFace++)
 		objectInfo.vertexCount	+= (mesh->face_vertices[currentFace] - 2);
 	objectInfo.vertexCount	*= 3;
 
-	objectInfo.materialCount	= mesh->material_count;
-	objectInfo.textureCount		= mesh->material_count * 3;
-
 	if (!(objectInfo.vertex			= malloc(objectInfo.vertexCount * sizeof(Kdo_Vertex))))
 		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(objectInfo.material		= malloc(objectInfo.materialCount * sizeof(Kdo_ShMaterial))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(objectInfo.texturePath	= malloc(objectInfo.materialCount * 3 * sizeof(char *))))
-		kdo_cleanup(vk, ERRLOC, 12);
 
-	for (uint32_t currentMaterial  = 0; currentMaterial  < mesh->material_count; currentMaterial ++)
-	{
-		objectInfo.material[currentMaterial].Ka[0]		= mesh->materials[currentMaterial].Ka[0];
-		objectInfo.material[currentMaterial].Ka[1]		= mesh->materials[currentMaterial].Ka[1];
-		objectInfo.material[currentMaterial].Ka[2]		= mesh->materials[currentMaterial].Ka[2];
-		objectInfo.material[currentMaterial].Kd[0]		= mesh->materials[currentMaterial].Kd[0];
-		objectInfo.material[currentMaterial].Kd[1]		= mesh->materials[currentMaterial].Kd[1];
-		objectInfo.material[currentMaterial].Kd[2]		= mesh->materials[currentMaterial].Kd[2];
-		objectInfo.material[currentMaterial].Ks[0]		= mesh->materials[currentMaterial].Ks[0];
-		objectInfo.material[currentMaterial].Ks[1]		= mesh->materials[currentMaterial].Ks[1];
-		objectInfo.material[currentMaterial].Ks[2]		= mesh->materials[currentMaterial].Ks[2];
-		objectInfo.material[currentMaterial].Ke[0]		= mesh->materials[currentMaterial].Ke[0];
-		objectInfo.material[currentMaterial].Ke[1]		= mesh->materials[currentMaterial].Ke[1];
-		objectInfo.material[currentMaterial].Ke[2]		= mesh->materials[currentMaterial].Ke[2];
-		objectInfo.material[currentMaterial].Kt[0]		= mesh->materials[currentMaterial].Kt[0];
-		objectInfo.material[currentMaterial].Kt[1]		= mesh->materials[currentMaterial].Kt[1];
-		objectInfo.material[currentMaterial].Kt[2]		= mesh->materials[currentMaterial].Kt[2];
-		objectInfo.material[currentMaterial].Tf[0]		= mesh->materials[currentMaterial].Tf[0];
-		objectInfo.material[currentMaterial].Tf[1]		= mesh->materials[currentMaterial].Tf[1];
-		objectInfo.material[currentMaterial].Tf[2]		= mesh->materials[currentMaterial].Tf[2];
-		objectInfo.material[currentMaterial].Ns			= mesh->materials[currentMaterial].Ns;
-		objectInfo.material[currentMaterial].Ni			= mesh->materials[currentMaterial].Ni;
-		objectInfo.material[currentMaterial].d			= mesh->materials[currentMaterial].d;
-		objectInfo.material[currentMaterial].illum		= mesh->materials[currentMaterial].illum;
-
-		objectInfo.material[currentMaterial].map_Kd		= currentMaterial * 3;
-		objectInfo.material[currentMaterial].map_Ks		= currentMaterial * 3 + 1;
-		objectInfo.material[currentMaterial].map_Bump	= currentMaterial * 3 + 2;
-
-		if (mesh->materials[currentMaterial].map_Kd.path)
-		{
-			if (!(objectInfo.texturePath[currentMaterial * 3]		= strdup(mesh->materials[currentMaterial].map_Kd.path)))
-				kdo_cleanup(vk, ERRLOC, 12);
-		}
-		else
-			objectInfo.texturePath[currentMaterial * 3]				= NULL;
-
-		if (mesh->materials[currentMaterial].map_Ks.path)
-		{
-			if (!(objectInfo.texturePath[currentMaterial * 3 + 1]	= strdup(mesh->materials[currentMaterial].map_Ks.path)))
-				kdo_cleanup(vk, ERRLOC, 12);
-		}
-		else
-			objectInfo.texturePath[currentMaterial * 3 + 1]			= NULL;
-
-		if (mesh->materials[currentMaterial].map_bump.path)
-		{
-			if (!(objectInfo.texturePath[currentMaterial * 3 + 2]	= strdup(mesh->materials[currentMaterial].map_bump.path)))
-				kdo_cleanup(vk, ERRLOC, 12);
-		}
-		else
-			objectInfo.texturePath[currentMaterial * 3 + 2]			= NULL;
-	}
-
-	currentFaceVertex   = 0;
-	currentVertex       = 0;
 	for(currentFace = 0; currentFace < mesh->face_count; currentFace++)
 	{
-		for (vertexOffset = 0; 3 <= mesh->face_vertices[currentFace] - vertexOffset; vertexOffset++)
-		{
-			objectInfo.vertex[currentVertex + vertexOffset * 3].pos[0]					=	mesh->positions[mesh->indices[currentFaceVertex].p * 3];
-			objectInfo.vertex[currentVertex + vertexOffset * 3].pos[1]					=	mesh->positions[mesh->indices[currentFaceVertex].p * 3 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3].pos[2]					=	mesh->positions[mesh->indices[currentFaceVertex].p * 3 + 2] * -1;
-			objectInfo.vertex[currentVertex + vertexOffset * 3].tex[0]					=	mesh->texcoords[mesh->indices[currentFaceVertex].t * 2];
-			objectInfo.vertex[currentVertex + vertexOffset * 3].tex[1]					=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex].t * 2 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3].relMaterialIndex		= mesh->face_materials[currentFace];
-
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].pos[0]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].pos[1]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].pos[2]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 1].p * 3 + 2] * -1;
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].tex[0]				=	mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 1].t * 2];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].tex[1]				=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 1].t * 2 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].relMaterialIndex	= mesh->face_materials[currentFace];
-
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].pos[0]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].pos[1]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].pos[2]				=	mesh->positions[mesh->indices[currentFaceVertex + vertexOffset + 2].p * 3 + 2] * -1;
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].tex[0]				=	mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 2].t * 2];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].tex[1]				=	1.0f - mesh->texcoords[mesh->indices[currentFaceVertex + vertexOffset + 2].t * 2 + 1];
-			objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].relMaterialIndex	= mesh->face_materials[currentFace];
-
-			if (1 < mesh->normal_count)
-			{
-				objectInfo.vertex[currentVertex + vertexOffset * 3].normal[0]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3];
-				objectInfo.vertex[currentVertex + vertexOffset * 3].normal[1]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3 + 1];
-				objectInfo.vertex[currentVertex + vertexOffset * 3].normal[2]		=	mesh->normals[mesh->indices[currentFaceVertex].n * 3 + 2] * -1;
-
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].normal[0]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3];
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].normal[1]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3 + 1];
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].normal[2]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 1].n * 3 + 2] * -1;
-
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].normal[0]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3];
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].normal[1]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3 + 1];
-				objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].normal[2]	=	mesh->normals[mesh->indices[currentFaceVertex + vertexOffset + 2].n * 3 + 2] * -1;
-			}
-			else
-			{
-				kdo_findNormal(objectInfo.vertex[currentVertex + vertexOffset * 3].pos, objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].pos, objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].pos, &objectInfo.vertex[currentVertex + vertexOffset * 3].normal);
-				glm_vec3_dup(objectInfo.vertex[currentVertex + vertexOffset * 3].normal, objectInfo.vertex[currentVertex + vertexOffset * 3 + 1].normal);
-				glm_vec3_dup(objectInfo.vertex[currentVertex + vertexOffset * 3].normal, objectInfo.vertex[currentVertex + vertexOffset * 3 + 2].normal);
-			}
-		}
-		currentVertex		+= 3 * vertexOffset;
-		currentFaceVertex	+= 2 + vertexOffset;
 	}
 
 	fast_obj_destroy(mesh);

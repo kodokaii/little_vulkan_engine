@@ -17,12 +17,16 @@
 
 typedef struct Kdo_VkObjectInfo
 {
-    uint32_t            vertexCount;
-    Kdo_Vertex          *vertex;
-    uint32_t            materialCount;
+    Kdo_VkVertex        *vertex;
+	vec3				*vector3;
+	vec2				*vector2;
     Kdo_ShMaterial      *material;
-	uint32_t			textureCount;
 	char				**texturePath;
+    uint32_t            vertexCount;
+	uint32_t			vector3Count;
+	uint32_t			vector2Count;
+    uint32_t            materialCount;
+	uint32_t			textureCount;
 }   Kdo_VkObjectInfo;
 
 void				kdo_initCore(Kdo_Vulkan *vk);

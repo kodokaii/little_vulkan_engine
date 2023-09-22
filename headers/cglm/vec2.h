@@ -47,6 +47,7 @@
    CGLM_INLINE void  glm_vec2_minv(vec2 v1, vec2 v2, vec2 dest)
    CGLM_INLINE void  glm_vec2_clamp(vec2 v, float minVal, float maxVal)
    CGLM_INLINE void  glm_vec2_lerp(vec2 from, vec2 to, float t, vec2 dest)
+   CGLM_INLINE void  glm_vec2_make(float * restrict src, vec2 dest)
 
  */
 
@@ -229,7 +230,7 @@ glm_vec2_subs(vec2 v, float s, vec2 dest) {
 }
 
 /*!
- * @brief multiply two vector (component-wise multiplication)
+ * @brief multiply two vectors (component-wise multiplication)
  *
  * @param a    v1
  * @param b    v2
@@ -370,7 +371,7 @@ glm_vec2_muladds(vec2 a, float s, vec2 dest) {
 }
 
 /*!
- * @brief add max of two vector to result/dest
+ * @brief add max of two vectors to result/dest
  *
  * it applies += operator so dest must be initialized
  *
@@ -386,7 +387,7 @@ glm_vec2_maxadd(vec2 a, vec2 b, vec2 dest) {
 }
 
 /*!
- * @brief add min of two vector to result/dest
+ * @brief add min of two vectors to result/dest
  *
  * it applies += operator so dest must be initialized
  *
@@ -580,6 +581,18 @@ glm_vec2_lerp(vec2 from, vec2 to, float t, vec2 dest) {
   glm_vec2_sub(to, from, v);
   glm_vec2_mul(s, v, v);
   glm_vec2_add(from, v, dest);
+}
+
+/*!
+ * @brief Create two dimensional vector from pointer
+ *
+ * @param[in]  src  pointer to an array of floats
+ * @param[out] dest destination vector
+ */
+CGLM_INLINE
+void
+glm_vec2_make(float * __restrict src, vec2 dest) {
+  dest[0] = src[0]; dest[1] = src[1];
 }
 
 #endif /* cglm_vec2_h */

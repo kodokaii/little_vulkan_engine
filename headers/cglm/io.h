@@ -13,6 +13,7 @@
    CGLM_INLINE void glm_vec3_print(vec3 vec, FILE *ostream);
    CGLM_INLINE void glm_ivec3_print(ivec3 vec, FILE *ostream);
    CGLM_INLINE void glm_versor_print(versor vec, FILE *ostream);
+   CGLM_INLINE void glm_arch_print(FILE *ostream);
  */
 
 /*
@@ -52,13 +53,64 @@
 #  define CGLM_PRINT_MAX_TO_SHORT 1e5f
 #endif
 
-#ifndef CGLM_PRINT_COLOR
-#  define CGLM_PRINT_COLOR        "\033[36m"
+#ifndef GLM_TESTS_NO_COLORFUL_OUTPUT
+#  ifndef CGLM_PRINT_COLOR
+#    define CGLM_PRINT_COLOR        "\033[36m"
+#  endif
+#  ifndef CGLM_PRINT_COLOR_RESET
+#    define CGLM_PRINT_COLOR_RESET  "\033[0m"
+#  endif
+#else
+#  ifndef CGLM_PRINT_COLOR
+#    define CGLM_PRINT_COLOR
+#  endif
+#  ifndef CGLM_PRINT_COLOR_RESET
+#    define CGLM_PRINT_COLOR_RESET
+#  endif
 #endif
 
-#ifndef CGLM_PRINT_COLOR_RESET
-#  define CGLM_PRINT_COLOR_RESET  "\033[0m"
+/*!
+ * @brief prints current SIMD path in general
+ *
+ * @param[in] ostream    stream to print e.g. stdout, stderr, FILE ...
+ */
+CGLM_INLINE
+void
+glm_arch_print(FILE* __restrict ostream) {
+  fprintf(ostream, CGLM_PRINT_COLOR "arch: "
+#if defined(CGLM_SIMD_WASM)
+  "wasm SIMD128"
+#elif defined(CGLM_SIMD_x86)
+  "x86 SSE* "
+#  ifdef __AVX__
+  " AVX"
+#  endif
+#elif defined(CGLM_SIMD_ARM)
+  "arm"
+#  ifndef __ARM_NEON_FP
+    " NEON_FP"
+#  endif
+#  ifdef CGLM_ARM64
+    " ARM64"
+#  endif
+#else
+  "uncommon"
 #endif
+  CGLM_PRINT_COLOR_RESET);
+}
+
+/*!
+ * @brief prints current SIMD path in general
+ *
+ * @param[in] ostream    stream to print e.g. stdout, stderr, FILE ...
+ */
+CGLM_INLINE
+void
+glm_arch_print_name(FILE* __restrict ostream) {
+  fprintf(ostream, CGLM_PRINT_COLOR "\ncglm ");
+  glm_arch_print(ostream);
+  fprintf(ostream, "\n\n" CGLM_PRINT_COLOR_RESET);
+}
 
 CGLM_INLINE
 void
@@ -340,6 +392,8 @@ glm_aabb_print(vec3                    bbox[2],
 #define glm_vec2_print(v, s) (void)v; (void)s;
 #define glm_versor_print(v, s) (void)v; (void)s;
 #define glm_aabb_print(v, t, s) (void)v; (void)t; (void)s;
+#define glm_arch_print(s) (void)s;
+#define glm_arch_print_name(s) (void)s;
 
 #endif
 #endif /* cglm_io_h */

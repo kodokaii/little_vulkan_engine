@@ -15,10 +15,7 @@ static void	kdo_readSpirV(Kdo_Vulkan *vk, const char *fileName, Kdo_Shader *shad
 {
 	FILE	*file;
 
-	if (!(file = fopen(fileName, "rb")))
-	{
-		printf("Can't open %s file\n", fileName);
-		kdo_cleanup(vk, "File error", 9);
+	if (!(file = fopen(fileName, "rb"))) { printf("Can't open %s file\n", fileName); kdo_cleanup(vk, "File error", 9);
 	}
 	fseek(file, 0, SEEK_END);
 	shader->codeSize = ftell(file);
@@ -116,7 +113,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	VkPipelineShaderStageCreateInfo				shaderStageInfo[2];
 	VkPipelineVertexInputStateCreateInfo		vertexInputInfo;
 	VkVertexInputBindingDescription				bindingDescription;
-	VkVertexInputAttributeDescription			attributeDescriptions[4];
+	VkVertexInputAttributeDescription			attributeDescriptions[6];
 	VkPipelineInputAssemblyStateCreateInfo		inputAssemblyInfo;
 	VkDynamicState								dynamicStates[]	= {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 	VkPipelineDynamicStateCreateInfo			dynamicStateInfo;
@@ -153,35 +150,45 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 
 
 	bindingDescription.binding		= 0;
-	bindingDescription.stride		= sizeof(Kdo_Vertex);
+	bindingDescription.stride		= sizeof(Kdo_VkVertex);
 	bindingDescription.inputRate	= VK_VERTEX_INPUT_RATE_VERTEX;
 
 	attributeDescriptions[0].location	= 0;
 	attributeDescriptions[0].binding	= 0;
-	attributeDescriptions[0].format		= VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[0].offset		= offsetof(Kdo_Vertex, pos);
+	attributeDescriptions[0].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[0].offset		= offsetof(Kdo_VkVertex, posIndex);
 
 	attributeDescriptions[1].location	= 1;
 	attributeDescriptions[1].binding	= 0;
-	attributeDescriptions[1].format		= VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[1].offset		= offsetof(Kdo_Vertex, normal);
+	attributeDescriptions[1].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[1].offset		= offsetof(Kdo_VkVertex, tangentIndex);
 
 	attributeDescriptions[2].location	= 2;
 	attributeDescriptions[2].binding	= 0;
-	attributeDescriptions[2].format		= VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[2].offset		= offsetof(Kdo_Vertex, tex);
+	attributeDescriptions[2].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[2].offset		= offsetof(Kdo_VkVertex, bitangentIndex);
 
 	attributeDescriptions[3].location	= 3;
 	attributeDescriptions[3].binding	= 0;
 	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
-	attributeDescriptions[3].offset		= offsetof(Kdo_Vertex, relMaterialIndex);
+	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, normalIndex);
+
+	attributeDescriptions[3].location	= 4;
+	attributeDescriptions[3].binding	= 0;
+	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, uvIndex);
+
+	attributeDescriptions[3].location	= 5;
+	attributeDescriptions[3].binding	= 0;
+	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, mtlIndex);
 
 	vertexInputInfo.sType								= VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.pNext								= NULL;
 	vertexInputInfo.flags								= 0;
 	vertexInputInfo.vertexBindingDescriptionCount		= 1;
 	vertexInputInfo.pVertexBindingDescriptions			= &bindingDescription;
-	vertexInputInfo.vertexAttributeDescriptionCount		= 4;
+	vertexInputInfo.vertexAttributeDescriptionCount		= 6;
 	vertexInputInfo.pVertexAttributeDescriptions		= attributeDescriptions;
 
 	inputAssemblyInfo.sType						= VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

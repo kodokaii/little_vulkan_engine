@@ -91,13 +91,22 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 	if (vk->device.path)
 		vkDeviceWaitIdle(vk->device.path);
 
-	kdo_freeBuffer(vk, &vk->core.buffer.vertex);
-	kdo_freeBuffer(vk, &vk->core.buffer.index);
-	kdo_freeBuffer(vk, &vk->core.buffer.materials);
-	kdo_freeBuffer(vk, &vk->core.buffer.materialMap);
-	kdo_freeBuffer(vk, &vk->core.buffer.object);
-	kdo_freeBuffer(vk, &vk->core.buffer.light);
-	kdo_freeImageBuffer(vk, &vk->core.buffer.textures);
+	kdo_freeBuffer(vk, &vk->core.buffer.vertex.path);
+	kdo_freeBuffer(vk, &vk->core.buffer.vector2.path);
+	kdo_freeBuffer(vk, &vk->core.buffer.vector3.path);
+	kdo_freeBuffer(vk, &vk->core.buffer.material.path);
+	kdo_freeBuffer(vk, &vk->core.buffer.light.path);
+	kdo_freeBuffer(vk, &vk->core.buffer.object.path);
+	kdo_freeImageBuffer(vk, &vk->core.buffer.texture.path);
+
+	KDO_FREE(vk->core.buffer.vertex.sort);
+	KDO_FREE(vk->core.buffer.vector2.sort);
+	KDO_FREE(vk->core.buffer.vector3.sort);
+	KDO_FREE(vk->core.buffer.material.sort);
+	KDO_FREE(vk->core.buffer.light.sort);
+	KDO_FREE(vk->core.buffer.object.sort);
+	KDO_FREE(vk->core.buffer.texture.name);
+	KDO_FREE(vk->core.buffer.texture.sort);
 
 	KDO_DESTROY(vkDestroyDescriptorPool, vk->device.path, vk->core.descriptorPool)
 	KDO_DESTROY(vkDestroySampler, vk->device.path, vk->core.sampler.basic)

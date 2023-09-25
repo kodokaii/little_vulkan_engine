@@ -19,29 +19,24 @@
 # define GLFW_INCLUDE_VULKAN
 # include <GLFW/glfw3.h>
 
+# include "kdo_VkBST.h"
+
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
 
-# define SZ_SHADER				2
+# define SZ_SHADER			2
 
-# define QUEUES_COUNT			3
-# define PRESENT_QUEUE			0
-# define GRAPHIC_QUEUE			1
-# define TRANSFER_QUEUE			2
+# define QUEUES_COUNT		3
+# define PRESENT_QUEUE		0
+# define GRAPHIC_QUEUE		1
+# define TRANSFER_QUEUE		2
 
-#define	VERTEX_BUFFER_SIZE		128
-#define	VECTOR3_BUFFER_SIZE		128
-#define	VECTOR2_BUFFER_SIZE		128
-#define	MATERIAL_BUFFER_SIZE	128
-#define	LIGHT_BUFFER_SIZE		128
+#define MAX_TEXTURES		32
+# define DEFAULT_TEXTURE	"textures/default.png"
 
-#define MAX_TEXTURES			32
-# define TEXTURE_BUFFER_SIZE	100000000
-# define DEFAULT_TEXTURE		"textures/default.png"
+# define ERRLOC				"CPU Memory allocation error"
 
-# define ERRLOC					"CPU Memory allocation error"
-# define FOR_NO_ERROR			-1
 
 typedef enum Kdo_VkWait
 {
@@ -53,7 +48,7 @@ typedef enum Kdo_VkStatus
 	INVISIBLE	= 0x00000001
 }	Kdo_VkStatus;
 
-typedef struct Kdo_ShMaterial
+typedef struct Kdo_VkMaterial
 {
 	vec3		ambient;
     uint32_t	ambientMap;
@@ -75,20 +70,20 @@ typedef struct Kdo_ShMaterial
     uint32_t	disolveMap;
     int			illum;
     uint32_t	bumpMap;
-}	Kdo_ShMaterial;
+}	Kdo_VkMaterial;
 
-typedef struct Kdo_ShObject
+typedef struct Kdo_VkObject
 {
-	mat4							modelMat;
-    mat4							normalMat;
-	VkDrawIndirectCommand			drawCommand;
-}	Kdo_ShObject;
+	mat4					modelMat;
+    mat4					normalMat;
+	VkDrawIndirectCommand	drawCommand;
+}	Kdo_VkObject;
 
-typedef struct Kdo_ShLight
+typedef struct Kdo_VkLight
 {
 	vec4	pos_intensity;
 	vec4	color_stop;
-}	Kdo_ShLight;
+}	Kdo_VkLight;
 
 typedef struct Kdo_VkPush
 {
@@ -292,15 +287,23 @@ typedef	struct Kdo_VkImageBuffer
 typedef	struct Kdo_VkBufferCoreElement
 {
 	Kdo_VkBuffer	path;
-	uint32_t		count;
-	uint32_t		*sort;
+	void			*bufferCpy;
+	Kdo_BST			*BSTRoot;
+	VkDeviceSize	sizeUsed;
+	VkDeviceSize	sizeFree;
+	uint32_t		countUpdate;
+	uint32_t		countNoUpdate;
 }	Kdo_VkBufferCoreElement;
 
 typedef	struct Kdo_VkImageCoreElement
 {
 	Kdo_VkImageBuffer	path;
 	char				**name;
-	uint32_t			*sort;
+	Kdo_BST				*BSTRoot;
+	VkDeviceSize		sizeUsed;
+	VkDeviceSize		sizeFree;
+	uint32_t			countUpdate;
+	uint32_t			countNoUpdate;
 }	Kdo_VkImageCoreElement;
 
 typedef struct Kdo_VkBufferCore

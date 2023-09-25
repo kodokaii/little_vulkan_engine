@@ -15,27 +15,30 @@
 #include "kdo_Vulkan.h"
 #include "kdo_VkOpenOBJ.h"
 
-typedef struct Kdo_VkRawVertex
-{
-	vec3		pos;
-	vec3		tangent;
-	vec3		bitangent;
-	vec3		normal;
-	vec2		uv;
-	uint32_t	mtl;
-}	Kdo_VkRawVertex;
-
 typedef struct Kdo_VkObjectInfo
 {
-	Kdo_VkRawVertex		*vertex;
-    Kdo_ShMaterial      *material;
-	char				**texturePath;
-    uint32_t            vertexCount;
-    uint32_t            materialCount;
-	uint32_t			textureCount;
+    uint32_t        freeVertexCount;
+	uint32_t		freePosCount;
+	uint32_t		freeTangentCount;
+	uint32_t		freeBitangentCount;
+	uint32_t		freeNormalCount;
+	uint32_t		freeUvCount;
+	uint32_t		freeMaterialCount;
+	uint32_t		freeTextureCount;
+	uint32_t		*posMatchArray;
+	uint32_t		*tangentMatchArray;
+	uint32_t		*bitangentMatchArray;
+	uint32_t		*normalMatchArray;
+	uint32_t		*uvMatchArray;
+	uint32_t		*materialMatchArray;
+	uint32_t		*textureMatchArray;
+	Kdo_VkObject	object;
 }   Kdo_VkObjectInfo;
 
-Kdo_ShMaterial		kdo_defaultMaterial(void);
+void				kdo_findNormal(vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal);
+void				kdo_findRawTangent(vec3 pos1, vec3 pos2, vec3 pos3, vec2 uv1, vec2 uv2, vec2 uv3, vec3 rawTangent);
+void				kdo_findTangent(vec3 rawTangent, vec2 normal, vec3 tangent);
+Kdo_VkMaterial		kdo_defaultMaterial(void);
 void				kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info);
 
 #endif

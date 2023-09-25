@@ -16,12 +16,9 @@
 
 static void	kdo_cpyMaterial(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObjMesh *mesh)
 {
-	objectInfo->materialCount		= glm_max(mesh->material_count, 1);
-	objectInfo->textureCount		= glm_max(mesh->material_count * 3, 1);
-
-	if (!(objectInfo->material		= malloc(objectInfo->materialCount * sizeof(Kdo_ShMaterial))))
+	if (!(objectInfo->material		= malloc(glm_max(mesh->material_count, 1) * sizeof(Kdo_ShMaterial))))
 		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(objectInfo->texturePath	= calloc(objectInfo->textureCount, sizeof(char *))))
+	if (!(objectInfo->texturePath	= calloc(glm_max(mesh->material_count * 3, 1), sizeof(char *))))
 		kdo_cleanup(vk, ERRLOC, 12);
 
 	if (!mesh->material_count)
@@ -71,122 +68,85 @@ static uint32_t	kdo_triangleCount(fastObjMesh *mesh)
 	return (triangleCount);
 }
 
-static void kdo_findNormal(vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal)
+static void	kdo_fanTriangulation(Kdo_VkObjectInfo *objectInfo, fastObjMesh *mesh, uint32_t *currentVertex, uint32_t currentFace)
 {
-	vec3	x;
-	vec3	y;
-
-	glm_vec3_sub(pos2, pos3, x);
-	glm_vec3_sub(pos2, pos1, y);
-	glm_vec3_crossn(x, y, normal);
-}
-
-static void	kdo_findRawTangent(vec3 pos1, vec3 pos2, vec3 pos3, vec2 uv1, vec2 uv2, vec2 uv3, vec3 rawTangent)
-{
-	vec3	deltaPos1;
-	vec3	deltaPos2;
-	vec2	deltaUV1;
-	vec2	deltaUV2;
-	float	factor;
-
-	glm_vec3_sub(pos2, pos1, deltaPos1);
-	glm_vec3_sub(pos3, pos1, deltaPos2);
-	glm_vec2_sub(uv2, uv1, deltaUV1);
-	glm_vec2_sub(uv3, uv1, deltaUV2);
-	factor = deltaUV1[0] * deltaUV2[1] - deltaUV1[1] * deltaUV2[0];
-
-	glm_vec3_scale(deltaPos1, deltaUV2[1], deltaPos1);
-	glm_vec3_scale(deltaPos2, deltaUV1[1], deltaPos1);
-	glm_vec3_sub(deltaPos1, deltaPos2, rawTangent);
-	glm_vec3_divs(rawTangent, factor, rawTangent);
-}
-
-static void	kdo_findTangent(vec3 rawTangent, vec2 normal, vec3 tangent)
-{
-	vec3			adjustVector;
-
-	glm_vec3_proj(rawTangent, normal, adjustVector);
-	glm_vec3_sub(rawTangent, adjustVector, tangent);
-	glm_vec3_normalize(tangent);
-}
-
-static void	kdo_cpyTriangle(Kdo_VkRawVertex *vertexDst, fastObjMesh *mesh, uint32_t faceIndex, uint32_t vertexSrcIndex, uint32_t vertexSrcOffset)
-{
-	fastObjIndex	vertex1;
+	fastObjIndex	mainVertex;
 	fastObjIndex	vertex2;
 	fastObjIndex	vertex3;
 	vec3			rawTangent;
+	uint32_t		vertexCount;
 
-	vertex1	= mesh->indices[vertexSrcIndex];
-	vertex2	= mesh->indices[vertexSrcIndex + vertexSrcOffset - 1];
-	vertex3 = mesh->indices[vertexSrcIndex + vertexSrcOffset];
-
-	glm_vec3_make(&mesh->positions[vertex1.p], vertexDst[0].pos);
-	glm_vec3_make(&mesh->positions[vertex2.p], vertexDst[1].pos);
-	glm_vec3_make(&mesh->positions[vertex3.p], vertexDst[2].pos);
-
-	glm_vec2_make(&mesh->texcoords[vertex1.t], vertexDst[0].uv);
-	glm_vec2_make(&mesh->texcoords[vertex2.t], vertexDst[1].uv);
-	glm_vec2_make(&mesh->texcoords[vertex3.t], vertexDst[2].uv);
-
-	kdo_findRawTangent(vertexDst[0].pos, vertexDst[1].pos, vertexDst[2].pos, vertexDst[0].uv, vertexDst[1].uv, vertexDst[2].uv, rawTangent);
-	if (1 < mesh->normal_count)
+	mainVertex	= mesh->indices[*currentVertex];
+	for (vertexCount = 2; vertexCount < mesh->face_vertices[currentFace]; vertexCount++)
 	{
-		glm_vec3_make(&mesh->normals[vertex1.n], vertexDst[0].normal);
-		glm_vec3_make(&mesh->normals[vertex2.n], vertexDst[1].normal);
-		glm_vec3_make(&mesh->normals[vertex3.n], vertexDst[2].normal);
+		vertex2	= mesh->indices[*currentVertex + vertexCount - 1];
+		vertex3 = mesh->indices[*currentVertex + vertexCount];
 
-		kdo_findTangent(rawTangent, vertexDst[0].normal, vertexDst[0].tangent);
-		kdo_findTangent(rawTangent, vertexDst[1].normal, vertexDst[1].tangent);
-		kdo_findTangent(rawTangent, vertexDst[2].normal, vertexDst[2].tangent);
-	
-		glm_vec3_crossn(vertexDst[0].normal, vertexDst[0].tangent, vertexDst[0].bitangent);
-		glm_vec3_crossn(vertexDst[1].normal, vertexDst[1].tangent, vertexDst[1].bitangent);
-		glm_vec3_crossn(vertexDst[2].normal, vertexDst[2].tangent, vertexDst[2].bitangent);
+		glm_vec3_make(&mesh->positions[mainVertex.p], objectInfo->vec3Array[*currentVertex * 4]);
+		glm_vec3_make(&mesh->positions[vertex2.p], objectInfo->vec3Array[*currentVertex * 4 + 1]);
+		glm_vec3_make(&mesh->positions[vertex3.p], objectInfo->vec3Array[*currentVertex * 4 + 2]);
+		objectInfo->vertex[*currentVertex + 0].posIndex	= *currentVertex * 4;
+		objectInfo->vertex[*currentVertex + 1].posIndex	= *currentVertex * 4 + 1;
+		objectInfo->vertex[*currentVertex + 2].posIndex	= *currentVertex * 4 + 2;
+
+		glm_vec2_make(&mesh->texcoords[mainVertex.t], objectInfo->vec2Array[*currentVertex]);
+		glm_vec2_make(&mesh->texcoords[vertex2.t], objectInfo->vec2Array[*currentVertex + 1]);
+		glm_vec2_make(&mesh->texcoords[vertex3.t], objectInfo->vec2Array[*currentVertex + 2]);
+
+		kdo_findRawTangent(objectInfo->vec3Array[*currentVertex * 4], objectInfo->vec3Array[*currentVertex * 4 + 1], objectInfo->vec3Array[*currentVertex * 4 + 2], \
+							objectInfo->vec2Array[*currentVertex], objectInfo->vec2Array[*currentVertex + 1], objectInfo->vec2Array[*currentVertex + 2], rawTangent);
+		if (1 < mesh->normal_count)
+		{
+			glm_vec3_make(&mesh->normals[mainVertex.n], vertexDst[0].normal);
+			glm_vec3_make(&mesh->normals[vertex2.n], vertexDst[1].normal);
+			glm_vec3_make(&mesh->normals[vertex3.n], vertexDst[2].normal);
+
+			kdo_findTangent(rawTangent, vertexDst[0].normal, vertexDst[0].tangent);
+			kdo_findTangent(rawTangent, vertexDst[1].normal, vertexDst[1].tangent);
+			kdo_findTangent(rawTangent, vertexDst[2].normal, vertexDst[2].tangent);
+		
+			glm_vec3_crossn(vertexDst[0].normal, vertexDst[0].tangent, vertexDst[0].bitangent);
+			glm_vec3_crossn(vertexDst[1].normal, vertexDst[1].tangent, vertexDst[1].bitangent);
+			glm_vec3_crossn(vertexDst[2].normal, vertexDst[2].tangent, vertexDst[2].bitangent);
+		}
+		else
+		{
+			kdo_findNormal(vertexDst[0].pos, vertexDst[1].pos, vertexDst[2].pos, vertexDst[0].normal);
+			glm_vec3_dup(vertexDst[0].normal, vertexDst[1].normal);
+			glm_vec3_dup(vertexDst[0].normal, vertexDst[2].normal);
+
+			glm_vec3_dup(rawTangent, vertexDst[0].tangent);
+			glm_vec3_dup(rawTangent, vertexDst[1].tangent);
+			glm_vec3_dup(rawTangent, vertexDst[2].tangent);
+
+			glm_vec3_crossn(vertexDst[0].normal, vertexDst[0].tangent, vertexDst[0].bitangent);
+			glm_vec3_dup(vertexDst[0].bitangent, vertexDst[1].bitangent);
+			glm_vec3_dup(vertexDst[0].bitangent, vertexDst[2].bitangent);
+		}
+
+		vertexDst[0].mtl	= mesh->face_materials[faceIndex];
+		vertexDst[1].mtl	= mesh->face_materials[faceIndex];
+		vertexDst[2].mtl	= mesh->face_materials[faceIndex];
+
+		*currentVertex += 3;
 	}
-	else
-	{
-		kdo_findNormal(vertexDst[0].pos, vertexDst[1].pos, vertexDst[2].pos, vertexDst[0].normal);
-		glm_vec3_dup(vertexDst[0].normal, vertexDst[1].normal);
-		glm_vec3_dup(vertexDst[0].normal, vertexDst[2].normal);
-
-		glm_vec3_dup(rawTangent, vertexDst[0].tangent);
-		glm_vec3_dup(rawTangent, vertexDst[1].tangent);
-		glm_vec3_dup(rawTangent, vertexDst[2].tangent);
-
-		glm_vec3_crossn(vertexDst[0].normal, vertexDst[0].tangent, vertexDst[0].bitangent);
-		glm_vec3_dup(vertexDst[0].bitangent, vertexDst[1].bitangent);
-		glm_vec3_dup(vertexDst[0].bitangent, vertexDst[2].bitangent);
-	}
-
-	vertexDst[0].mtl	= mesh->face_materials[faceIndex];
-	vertexDst[1].mtl	= mesh->face_materials[faceIndex];
-	vertexDst[2].mtl	= mesh->face_materials[faceIndex];
 }
 
 static void	kdo_cpyVertex(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObjMesh *mesh)
 {
 	uint32_t	currentFace;
-	uint32_t	vertexSrcOffset;
-	uint32_t	currentVertexSrc;
-	uint32_t	currentVertexDst;
+	uint32_t	currentVertex;
 
 	objectInfo->vertexCount		= kdo_triangleCount(mesh) * 3;
 
-	if (!(objectInfo->vertex	= malloc(objectInfo->vertexCount * sizeof(Kdo_VkRawVertex))))
+	if (!(objectInfo->vertex	= malloc(objectInfo->vertexCount * sizeof(Kdo_VkVertex))))
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (!(objectInfo->vec3Array = malloc(objectInfo->vertexCount * 3 * sizeof(vec3))))
 		kdo_cleanup(vk, ERRLOC, 12);
 	
-	currentVertexSrc = 0;
-	currentVertexDst = 0;
+	currentVertex	= 0;
 	for (currentFace = 0; currentFace < mesh->face_count; currentFace++)
-	{
-		for (vertexSrcOffset = 2; vertexSrcOffset < mesh->face_vertices[currentFace]; vertexSrcOffset++)
-		{
-			kdo_cpyTriangle(&objectInfo->vertex[currentVertexDst], mesh, currentFace, currentVertexSrc, vertexSrcOffset);	
-			currentVertexDst += 3;
-		}
-		currentVertexSrc += mesh->face_vertices[currentFace];
-	}
+		kdo_fanTriangulation(objectInfo, mesh, &currentVertex, currentFace);
 }
 
 Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath)

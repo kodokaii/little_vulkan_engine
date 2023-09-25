@@ -39,7 +39,7 @@ VkFormat	kdo_findFormat(Kdo_Vulkan *vk, VkFormat *formats, uint32_t formatsCount
 			return (formats[i]);
 	}
 	kdo_cleanup(vk, "Couldn't find format", 8);
-	return (FOR_NO_ERROR);
+	return (8);
 }
 
 uint32_t	kdo_findMemoryType(Kdo_Vulkan *vk, uint32_t typeFilter, VkMemoryPropertyFlags memoryFlags)
@@ -50,7 +50,7 @@ uint32_t	kdo_findMemoryType(Kdo_Vulkan *vk, uint32_t typeFilter, VkMemoryPropert
 			return (i);
 	}
 	kdo_cleanup(vk, "Couldn't find a suitable memory type", 15);
-	return (FOR_NO_ERROR);
+	return (15);
 }
 
 void	kdo_beginUniqueCommand(Kdo_Vulkan *vk, VkCommandBuffer *commandBuffer)

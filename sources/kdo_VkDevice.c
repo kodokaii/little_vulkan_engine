@@ -51,7 +51,7 @@ static uint32_t	kdo_findQueueFamilyIndex(Kdo_Vulkan *vk, Kdo_VkQueueInfo info)
 		return (index);
 	}
 	kdo_cleanup(vk, "Couldn't find queue family", 5);
-	return (FOR_NO_ERROR);
+	return (5);
 }
 
 static uint32_t	kdo_createQueueInfo(Kdo_Vulkan *vk, VkDeviceQueueCreateInfo **queueCreateInfo, float *queuePriority)

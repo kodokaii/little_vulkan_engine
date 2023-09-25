@@ -13,8 +13,7 @@
 
 static void	kdo_updateAllTextureDescriptor(Kdo_Vulkan *vk)
 {
-	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES];
-	VkWriteDescriptorSet			descriptorWrite;
+	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES]; VkWriteDescriptorSet			descriptorWrite;
 
 	for (uint32_t i = 0; i < MAX_TEXTURES; i++)
 	{
@@ -163,9 +162,9 @@ static uint32_t	kdo_loadTexture(Kdo_Vulkan *vk, char *texturePath)
 	return (0);
 }
 
-Kdo_ShMaterial	kdo_defaultMaterial(void)
+Kdo_VkMaterial	kdo_defaultMaterial(void)
 {
-	Kdo_ShMaterial	defaultMtl	=	{{0, 0, 0}, 0,	//ambient
+	Kdo_VkMaterial	defaultMtl	=	{{0, 0, 0}, 0,	//ambient
 									{1, 1, 1}, 0,	//diffuse
 									{1, 1, 1}, 0,	//specular
 									{1, 1, 1}, 0,	//emissive
@@ -174,63 +173,156 @@ Kdo_ShMaterial	kdo_defaultMaterial(void)
 									400, 0,			//shininess
 									1, 0,			//refractionIndex
 									1, 0,			//disolve
-									0,				//illum
+									1,				//illum
 									0};				//bumpMap
 	return (defaultMtl);
 }
 
+void kdo_findNormal(vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal)
+{
+  vec3    x;
+  vec3    y;
+
+  glm_vec3_sub(pos2, pos3, x);
+  glm_vec3_sub(pos2, pos1, y);
+  glm_vec3_crossn(x, y, normal);
+}
+
+void kdo_findRawTangent(vec3 pos1, vec3 pos2, vec3 pos3, vec2 uv1, vec2 uv2, vec2 uv3, vec3 rawTangent)
+{
+  vec3    deltaPos1;
+  vec3    deltaPos2;
+  vec2    deltaUV1;
+  vec2    deltaUV2;
+  float   factor;
+
+  glm_vec3_sub(pos2, pos1, deltaPos1);
+  glm_vec3_sub(pos3, pos1, deltaPos2);
+  glm_vec2_sub(uv2, uv1, deltaUV1);
+  glm_vec2_sub(uv3, uv1, deltaUV2);
+
+  factor = deltaUV1[0] * deltaUV2[1] - deltaUV1[1] * deltaUV2[0];
+  if (factor == 0.0f)
+  {
+	  glm_vec3_zero(rawTangent);
+	  return ;
+  }
+
+  glm_vec3_scale(deltaPos1, deltaUV2[1], deltaPos1);
+  glm_vec3_scale(deltaPos2, deltaUV1[1], deltaPos2);
+  glm_vec3_sub(deltaPos1, deltaPos2, rawTangent);
+  glm_vec3_divs(rawTangent, factor, rawTangent);
+}
+
+void kdo_findTangent(vec3 rawTangent, vec2 normal, vec3 tangent)
+{
+  vec3            adjustVector;
+
+  glm_vec3_proj(rawTangent, normal, adjustVector);
+  glm_vec3_sub(rawTangent, adjustVector, tangent);
+  glm_vec3_normalize(tangent);
+}
+
+Kdo_VkObjectInfo	*kdo_createObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t posCount, uint32_t tangentCount , uint32_t bitangentCount, uint32_t normalCount, uint32_t uvCount, uint32_t materialCount, uint32_t textureCount)
+{
+	Kdo_VkObjectInfo	*objectInfo;
+
+	
+	if (!(objectInfo	= malloc(sizeof(Kdo_VkObjectInfo))))
+		return (NULL);
+
+	if ((vk->core.buffer.vertex.sizeFree < vertexCount * sizeof(Kdo_VkVertex)
+			&& !(vk->core.buffer.vertex.bufferCpy	= realloc(vk->core.buffer.vertex.bufferCpy, vk->core.buffer.vertex.sizeUsed + vertexCount * sizeof(Kdo_VkVertex))))
+
+	 || (vk->core.buffer.vector3.sizeFree < (posCount + tangentCount + bitangentCount + normalCount) * sizeof(vec3)
+			&& !(vk->core.buffer.vector3.bufferCpy	= realloc(vk->core.buffer.vector3.bufferCpy, vk->core.buffer.vector3.sizeUsed + (posCount + tangentCount + bitangentCount + normalCount) * sizeof(vec3))))
+
+	 || (vk->core.buffer.vector2.sizeFree < uvCount * sizeof(vec2)
+			&& !(vk->core.buffer.vector2.bufferCpy	= realloc(vk->core.buffer.vector2.bufferCpy, vk->core.buffer.vector2.sizeUsed + uvCount * sizeof(vec2))))
+
+	 || (vk->core.buffer.material.sizeFree < materialCount * sizeof(Kdo_VkMaterial)
+			&& !(vk->core.buffer.material.bufferCpy	= realloc(vk->core.buffer.material.bufferCpy, vk->core.buffer.material.sizeUsed + materialCount * sizeof(Kdo_VkMaterial))))
+
+	 || (vk->core.buffer.texture.sizeFree < textureCount * sizeof(char *)
+			&& !(vk->core.buffer.texture.name		= realloc(vk->core.buffer.texture.name, vk->core.buffer.texture.sizeUsed + textureCount * sizeof(char *))))
+
+	 || (!(objectInfo->posMatchArray				= calloc(posCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->tangentMatchArray			= calloc(tangentCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->bitangentMatchArray			= calloc(bitangentCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->normalMatchArray				= calloc(normalCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->uvMatchArray					= calloc(uvCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->materialMatchArray			= calloc(materialCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->textureMatchArray			= calloc(textureCount + 1, sizeof(uint32_t)))))
+		return (NULL);
+
+	
+	glm_mat4_identity(objectInfo->object.modelMat);
+	glm_mat4_identity(objectInfo->object.normalMat);
+	objectInfo->freeVertexCount						= vertexCount;
+	objectInfo->freePosCount						= posCount;
+	objectInfo->freeTangentCount					= tangentCount;
+	objectInfo->freeBitangentCount					= bitangentCount;
+	objectInfo->freeNormalCount						= normalCount;
+	objectInfo->freeUvCount							= uvCount;
+	objectInfo->freeMaterialCount					= materialCount;
+	objectInfo->freeTextureCount					= textureCount;
+	objectInfo->object.drawCommand.vertexCount		= 0;
+	objectInfo->object.drawCommand.instanceCount	= 1;
+	objectInfo->object.drawCommand.firstVertex		= vk->core.buffer.vertex.countUpdate + vk->core.buffer.vertex.countNoUpdate;
+
+	//add default index 0 !!
+
+	return (objectInfo);
+}
+
+int	kdo_addPos(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos)
+{
+
+	return (0);
+}
+
+int	kdo_addTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent)
+{
+
+	return (0);
+}
+
+int	kdo_addBitangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent)
+{
+
+	return (0);
+}
+
+int	kdo_addNormal(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal)
+{
+
+	return (0);
+}
+
+int	kdo_addUv(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2 uv)
+{
+
+	return (0);
+}
+
+int	kdo_addMtl(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial mtl)
+{
+
+	return (0);
+}
+
+int	kdo_addTexture(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, char *path)
+{
+
+	return (0);
+}
+
+int	kdo_addTriangle(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
+{
+
+	return (0);
+}
+
 void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info)
 {
-	Kdo_ShObjectMap	objectMap;
-	uint32_t		*materialMap;
-
-	if (!(materialMap = malloc(info.materialCount * sizeof(uint32_t))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	glm_mat4_identity(objectMap.modelMat);
-	glm_mat4_identity(objectMap.normalMat);
-	objectMap.materialOffset				= vk->core.count.materialMap;
-	objectMap.drawCommand.indexCount		= info.vertexCount;
-	objectMap.drawCommand.instanceCount		= 1;
-	objectMap.drawCommand.firstIndex		= vk->core.count.index;
-	objectMap.drawCommand.vertexOffset		= vk->core.count.vertex;
-	objectMap.drawCommand.firstInstance		= vk->core.count.object;
-	kdo_setData(vk, &vk->core.buffer.object, &objectMap, sizeof(Kdo_ShObjectMap), vk->core.buffer.object.sizeUsed);
-
-	for (uint32_t currentMaterial = 0; currentMaterial < info.materialCount; currentMaterial++)
-	{
-		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Kd]))
-			info.material[currentMaterial].map_Kd	= 0;
-		else
-			info.material[currentMaterial].map_Kd	= vk->core.buffer.textures.imageCount - 1;
-
-		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Ks]))
-			info.material[currentMaterial].map_Ks	= 0;
-		else
-			info.material[currentMaterial].map_Ks	= vk->core.buffer.textures.imageCount - 1;
-
-		if (kdo_loadTexture(vk, info.texturePath[info.material[currentMaterial].map_Bump]))
-			info.material[currentMaterial].map_Bump	= 0;
-		else
-			info.material[currentMaterial].map_Bump	= vk->core.buffer.textures.imageCount - 1;
-
-		kdo_setData(vk, &vk->core.buffer.materials, &info.material[currentMaterial], sizeof(Kdo_ShMaterial), vk->core.buffer.materials.sizeUsed);
-
-		materialMap[currentMaterial] = vk->core.count.materialMap + currentMaterial;
-	}
-	kdo_setData(vk, &vk->core.buffer.materialMap, materialMap, info.materialCount * sizeof(uint32_t), vk->core.buffer.materialMap.sizeUsed);
-
-	vk->core.count.vertex		+= kdo_loadMesh(vk, info.vertex, info.vertexCount);
-	vk->core.count.index		+= info.vertexCount;
-	vk->core.count.materialMap	+= info.materialCount;
-	vk->core.count.materials	+= info.materialCount;
-	vk->core.count.object		+= 1;
-
-	for (uint32_t i = 0; i < info.textureCount; i++)
-		free(info.texturePath[i]);
-
-	free(info.vertex);
-	free(info.material);
-	free(info.texturePath);
-	free(materialMap);
 }

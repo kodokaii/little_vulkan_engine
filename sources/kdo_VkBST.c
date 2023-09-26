@@ -11,7 +11,7 @@
 
 #include "kdo_VkBST.h"
 
-Kdo_BST	*kdo_BSTCreateNode(uint32_t	index)
+static Kdo_BST	*kdo_BSTCreateNode(uint32_t	index)
 {
 	Kdo_BST	*node;
 

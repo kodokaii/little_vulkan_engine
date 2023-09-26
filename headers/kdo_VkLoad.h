@@ -14,6 +14,7 @@
 
 #include "kdo_Vulkan.h"
 #include "kdo_VkOpenOBJ.h"
+#include <libgen.h>
 
 typedef struct Kdo_VkObjectInfo
 {

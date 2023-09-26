@@ -37,7 +37,6 @@
 
 # define ERRLOC				"CPU Memory allocation error"
 
-
 typedef enum Kdo_VkWait
 {
 	WAIT_DEVICE	= 0x00000001
@@ -289,8 +288,8 @@ typedef	struct Kdo_VkBufferCoreElement
 	Kdo_VkBuffer	path;
 	void			*bufferCpy;
 	Kdo_BST			*BSTRoot;
-	VkDeviceSize	sizeUsed;
-	VkDeviceSize	sizeFree;
+	size_t			sizeUsed;
+	size_t			sizeFree;
 	uint32_t		countUpdate;
 	uint32_t		countNoUpdate;
 }	Kdo_VkBufferCoreElement;
@@ -300,8 +299,8 @@ typedef	struct Kdo_VkImageCoreElement
 	Kdo_VkImageBuffer	path;
 	char				**name;
 	Kdo_BST				*BSTRoot;
-	VkDeviceSize		sizeUsed;
-	VkDeviceSize		sizeFree;
+	uint32_t			countUsed;
+	uint32_t			countFree;
 	uint32_t			countUpdate;
 	uint32_t			countNoUpdate;
 }	Kdo_VkImageCoreElement;

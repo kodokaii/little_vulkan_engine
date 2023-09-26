@@ -23,4 +23,7 @@ typedef struct Kdo_BST
 	uint32_t		index;
 }	Kdo_BST;
 
+void    *kdo_BSTaddData(Kdo_BST **root, void *buffer, size_t sizeData, uint32_t *index, void *data);
+char    *kdo_BSTaddStr(Kdo_BST **root, char **strBuffer, uint32_t *index, char *str);
+
 #endif

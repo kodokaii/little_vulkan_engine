@@ -32,7 +32,7 @@
 # define GRAPHIC_QUEUE		1
 # define TRANSFER_QUEUE		2
 
-#define MAX_TEXTURES		32
+#define MAX_TEXTURE			32
 # define DEFAULT_TEXTURE	"textures/default.png"
 
 # define ERRLOC				"CPU Memory allocation error"
@@ -285,8 +285,8 @@ typedef	struct Kdo_VkImageBuffer
 
 typedef	struct Kdo_VkBufferCoreElement
 {
-	Kdo_VkBuffer	path;
-	void			*bufferCpy;
+	Kdo_VkBuffer	bufferGPU;
+	void			*bufferCPU;
 	Kdo_BST			*BSTRoot;
 	size_t			sizeUsed;
 	size_t			sizeFree;
@@ -296,8 +296,8 @@ typedef	struct Kdo_VkBufferCoreElement
 
 typedef	struct Kdo_VkImageCoreElement
 {
-	Kdo_VkImageBuffer	path;
-	char				**name;
+	Kdo_VkImageBuffer	imageGPU;
+	char				**nameCPU;
 	Kdo_BST				*BSTRoot;
 	uint32_t			countUsed;
 	uint32_t			countFree;
@@ -307,13 +307,14 @@ typedef	struct Kdo_VkImageCoreElement
 
 typedef struct Kdo_VkBufferCore
 {
-	Kdo_VkBufferCoreElement		vertex;
 	Kdo_VkBufferCoreElement		vector3;
 	Kdo_VkBufferCoreElement		vector2;
 	Kdo_VkBufferCoreElement		material;
 	Kdo_VkBufferCoreElement		light;
 	Kdo_VkImageCoreElement		texture;
-	Kdo_VkBufferCoreElement		object;
+	Kdo_VkBuffer				vertex;
+	Kdo_VkBuffer				object;
+	uint32_t					objectCount;
 }	Kdo_VkBufferCore;
 
 typedef struct Kdo_VkBufferCoreCount

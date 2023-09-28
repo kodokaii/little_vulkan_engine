@@ -11,6 +11,22 @@
 
 #include "kdo_VkLoad.h"
 
+Kdo_VkMaterial	kdo_defaultMaterial(void)
+{
+	Kdo_VkMaterial	defaultMtl	=	{{0, 0, 0}, 0,	//ambient
+									{1, 1, 1}, 0,	//diffuse
+									{1, 1, 1}, 0,	//specular
+									{1, 1, 1}, 0,	//emissive
+									{1, 1, 1}, 0,	//transmittance
+									{1, 1, 1}, 0,	//transmissionFilter
+									400, 0,			//shininess
+									1, 0,			//refractionIndex
+									1, 0,			//disolve
+									1,				//illum
+									0};				//bumpMap
+	return (defaultMtl);
+}
+
 static void	kdo_updateAllTextureDescriptor(Kdo_Vulkan *vk)
 {
 	VkDescriptorImageInfo			writeImageInfo[MAX_TEXTURES]; VkWriteDescriptorSet			descriptorWrite;
@@ -111,22 +127,6 @@ static void kdo_initDescriptorSets(Kdo_Vulkan *vk)
 	kdo_updateAllTextureDescriptor(vk);
 }
 
-static uint32_t	kdo_loadMesh(Kdo_Vulkan *vk, Kdo_Vertex *vertexIn, uint32_t vertexInCount)
-{
-	uint32_t	*indexOut;
-	uint32_t	vertexOutCount;
-	Kdo_Vertex	*vertexOut;
-
-	vertexOutCount = kdo_splitMesh(vk, vertexIn, vertexInCount, &vertexOut, &indexOut);
-	kdo_setData(vk, &vk->core.buffer.vertex, vertexOut, vertexOutCount * sizeof(Kdo_Vertex), vk->core.buffer.vertex.sizeUsed);
-	kdo_setData(vk, &vk->core.buffer.index, indexOut, vertexInCount * sizeof(uint32_t), vk->core.buffer.index.sizeUsed);
-
-	free(vertexOut);
-	free(indexOut);
-
-	return (vertexOutCount);
-}
-
 static uint32_t	kdo_loadTexture(Kdo_Vulkan *vk, char *texturePath)
 {
 	VkDescriptorImageInfo	writeImageInfo;
@@ -162,10 +162,10 @@ static uint32_t	kdo_loadTexture(Kdo_Vulkan *vk, char *texturePath)
 	return (0);
 }
 
-static int	kdo_allocBufferCpy(Kdo_VkBufferCoreElement *buffer, size_t needSize)
+static int	kdo_allocBufferCPU(Kdo_VkBufferCoreElement *buffer, size_t needSize)
 {
 	if (buffer->sizeFree < needSize)
-		if (!(buffer->bufferCpy	= realloc(buffer->bufferCpy, buffer->sizeUsed + needSize)))
+		if (!(buffer->bufferCPU	= realloc(buffer->bufferCPU, buffer->sizeUsed + needSize)))
 			return (1);
 	buffer->sizeUsed	+= needSize;
 	buffer->sizeFree	-= glm_min(buffer->sizeFree, needSize);
@@ -173,7 +173,7 @@ static int	kdo_allocBufferCpy(Kdo_VkBufferCoreElement *buffer, size_t needSize)
 	return (0);
 }
 
-static void	kdo_freeBufferCpy(Kdo_VkBufferCoreElement *buffer, size_t freeSize)
+static void	kdo_freeBufferCPU(Kdo_VkBufferCoreElement *buffer, size_t freeSize)
 {
 	buffer->sizeFree	+= glm_min(buffer->sizeUsed, freeSize);	
 	buffer->sizeUsed	-= glm_min(buffer->sizeUsed, freeSize);
@@ -182,7 +182,7 @@ static void	kdo_freeBufferCpy(Kdo_VkBufferCoreElement *buffer, size_t freeSize)
 static int	kdo_allocImageCpy(Kdo_VkImageCoreElement *image, uint32_t needCount)
 {
 	if (image->countFree < needCount)
-		if (!(image->name	= realloc(image->name, (image->countUsed + needCount) * sizeof(char *))))
+		if (!(image->nameCPU	= realloc(image->nameCPU, (image->countUsed + needCount) * sizeof(char *))))
 			return (1);
 	image->countUsed	+= needCount;
 	image->countFree	-= glm_min(image->countFree, needCount);
@@ -196,107 +196,191 @@ static void	kdo_freeImageCpy(Kdo_VkImageCoreElement *image, uint32_t freeCount)
 	image->countUsed	-= glm_min(image->countUsed, freeCount);
 }
 
+static int	kdo_addDataCPU(Kdo_VkBufferCoreElement *buffer, size_t sizeData, void *data, uint32_t *index)
+{	
+	uint32_t	endIndex;
 
-
-Kdo_VkMaterial	kdo_defaultMaterial(void)
-{
-	Kdo_VkMaterial	defaultMtl	=	{{0, 0, 0}, 0,	//ambient
-									{1, 1, 1}, 0,	//diffuse
-									{1, 1, 1}, 0,	//specular
-									{1, 1, 1}, 0,	//emissive
-									{1, 1, 1}, 0,	//transmittance
-									{1, 1, 1}, 0,	//transmissionFilter
-									400, 0,			//shininess
-									1, 0,			//refractionIndex
-									1, 0,			//disolve
-									1,				//illum
-									0};				//bumpMap
-	return (defaultMtl);
+	endIndex	= buffer->countUpdate + buffer->countNoUpdate;
+	*index		= endIndex;	
+	if (!(kdo_BSTaddData(&buffer->BSTRoot, buffer->bufferCPU, sizeData, index, data)))
+		return (-1);
+	if (*index == endIndex)
+	{
+		buffer->countNoUpdate++;
+		return (1);
+	}
+	return (0);
 }
 
-void kdo_findNormal(vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal)
-{
-  vec3    x;
-  vec3    y;
+static int	kdo_addImageCPU(Kdo_VkImageCoreElement *image, char *path, uint32_t *index)
+{	
+	uint32_t	endIndex;
 
-  glm_vec3_sub(pos2, pos3, x);
-  glm_vec3_sub(pos2, pos1, y);
-  glm_vec3_crossn(x, y, normal);
+	endIndex	= image->countUpdate + image->countNoUpdate;
+	*index		= endIndex;	
+	if (!(kdo_BSTaddStr(&image->BSTRoot, image->nameCPU, index, basename(path))))
+		return (-1);
+	if (*index == endIndex)
+	{
+		image->countNoUpdate++;
+		return (1);
+	}
+	return (0);
 }
 
-void kdo_findRawTangent(vec3 pos1, vec3 pos2, vec3 pos3, vec2 uv1, vec2 uv2, vec2 uv3, vec3 rawTangent)
+static uint32_t	kdo_calculateNormal(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
 {
-  vec3    deltaPos1;
-  vec3    deltaPos2;
-  vec2    deltaUV1;
-  vec2    deltaUV2;
-  float   factor;
+	vec3		pos1;
+	vec3		pos2;
+	vec3		pos3;
+	vec3		deltaPos1;
+	vec3		deltaPos2;
+	vec3		normal;
+	int			returnCode;
+	uint32_t	index;
 
-  glm_vec3_sub(pos2, pos1, deltaPos1);
-  glm_vec3_sub(pos3, pos1, deltaPos2);
-  glm_vec2_sub(uv2, uv1, deltaUV1);
-  glm_vec2_sub(uv3, uv1, deltaUV2);
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[0].posIndex], pos1);
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[1].posIndex], pos2);
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[2].posIndex], pos3);
 
-  factor = deltaUV1[0] * deltaUV2[1] - deltaUV1[1] * deltaUV2[0];
-  if (factor == 0.0f)
-  {
-	  glm_vec3_zero(rawTangent);
-	  return ;
-  }
+	glm_vec3_sub(pos2, pos1, deltaPos1);
+	glm_vec3_sub(pos3, pos1, deltaPos2);
+	glm_vec3_crossn(deltaPos1, deltaPos2, normal);
 
-  glm_vec3_scale(deltaPos1, deltaUV2[1], deltaPos1);
-  glm_vec3_scale(deltaPos2, deltaUV1[1], deltaPos2);
-  glm_vec3_sub(deltaPos1, deltaPos2, rawTangent);
-  glm_vec3_divs(rawTangent, factor, rawTangent);
+	if (!objectInfo->normal.freeCount)
+		return (0);
+
+	returnCode	= kdo_addDataCPU(vk->core.buffer.vector3.bufferCPU, sizeof(vec3), &normal, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->normal.freeCount--;
+
+	return (index);
 }
 
-void kdo_findTangent(vec3 rawTangent, vec2 normal, vec3 tangent)
+static void	kdo_calculateRawTangent(Kdo_Vulkan *vk, Kdo_VkVertex vertex[3], vec3 rawTangent)
 {
-  vec3            adjustVector;
+	vec3	pos1;
+	vec3	pos2;
+	vec3	pos3;
+	vec2	uv1;
+	vec2	uv2;
+	vec2	uv3;
+	vec3    deltaPos1;
+	vec3    deltaPos2;
+	vec2    deltaUV1;
+	vec2    deltaUV2;
+	float   factor;
+	
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[0].posIndex], pos1);
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[1].posIndex], pos2);
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex[2].posIndex], pos3);
+	
+	glm_vec2_copy(((vec2 *)vk->core.buffer.vector2.bufferCPU)[vertex[0].uvIndex], uv1);
+	glm_vec2_copy(((vec2 *)vk->core.buffer.vector2.bufferCPU)[vertex[1].uvIndex], uv2);
+	glm_vec2_copy(((vec2 *)vk->core.buffer.vector2.bufferCPU)[vertex[2].uvIndex], uv3);
 
-  glm_vec3_proj(rawTangent, normal, adjustVector);
-  glm_vec3_sub(rawTangent, adjustVector, tangent);
-  glm_vec3_normalize(tangent);
+	glm_vec3_sub(pos2, pos1, deltaPos1);
+	glm_vec3_sub(pos3, pos1, deltaPos2);
+	glm_vec2_sub(uv2, uv1, deltaUV1);
+	glm_vec2_sub(uv3, uv1, deltaUV2);
+	factor = deltaUV1[0] * deltaUV2[1] - deltaUV1[1] * deltaUV2[0];
+
+	glm_vec3_scale(deltaPos1, deltaUV2[1], deltaPos1);
+	glm_vec3_scale(deltaPos2, deltaUV1[1], deltaPos2);
+	glm_vec3_sub(deltaPos1, deltaPos2, rawTangent);
+	glm_vec3_divs(rawTangent, factor, rawTangent);
+}
+
+uint32_t	kdo_calculateTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex, vec3 rawTangent)
+{
+	vec3			normal;
+	vec3            adjustVector;
+	vec3			tangent;
+	int				returnCode;
+	uint32_t		index;
+
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex.normalIndex], normal);
+
+	glm_vec3_proj(rawTangent, normal, adjustVector);
+	glm_vec3_sub(rawTangent, adjustVector, tangent);
+	glm_vec3_normalize(tangent);
+
+	if (!objectInfo->tangent.freeCount)
+		return (0);
+
+	returnCode	= kdo_addDataCPU(vk->core.buffer.vector3.bufferCPU, sizeof(vec3), &tangent, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->tangent.freeCount--;
+
+	return (index);
+}
+
+static uint32_t	kdo_calculateBitangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex)
+{
+	vec3		normal;
+	vec3		tangent;
+	vec3		bitangent;
+	int			returnCode;
+	uint32_t	index;
+
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex.normalIndex], normal);	
+	glm_vec3_copy(((vec3 *)vk->core.buffer.vector3.bufferCPU)[vertex.tangentIndex], tangent);	
+
+	glm_vec3_crossn(normal, tangent, bitangent);
+
+	if (!objectInfo->bitangent.freeCount)
+		return (0);
+
+	returnCode	= kdo_addDataCPU(vk->core.buffer.vector3.bufferCPU, sizeof(vec3), &bitangent, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->bitangent.freeCount--;
+
+	return (index);
 }
 
 
-
-Kdo_VkObjectInfo	*kdo_createObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t posCount, uint32_t tangentCount , uint32_t bitangentCount, uint32_t normalCount, uint32_t uvCount, uint32_t materialCount, uint32_t textureCount)
+Kdo_VkObjectInfo	*kdo_initObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t posCount, uint32_t tangentCount , uint32_t bitangentCount, uint32_t normalCount, uint32_t uvCount, uint32_t materialCount, uint32_t textureCount)
 {
 	Kdo_VkObjectInfo	*objectInfo;
 
+	if (MAX_TEXTURE < vk->core.buffer.texture.countUpdate + vk->core.buffer.texture.countNoUpdate + textureCount)
+		return (NULL);
 	
 	if (!(objectInfo	= malloc(sizeof(Kdo_VkObjectInfo))))
 		return (NULL);
-
-	if (kdo_allocBufferCpy(&vk->core.buffer.vertex, vertexCount * sizeof(Kdo_VkVertex))
-	 || kdo_allocBufferCpy(&vk->core.buffer.vector3, (posCount + tangentCount + bitangentCount + normalCount) * sizeof(vec3))
-	 || kdo_allocBufferCpy(&vk->core.buffer.vector2, uvCount * sizeof(vec2))
-	 || kdo_allocBufferCpy(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
-	 || kdo_allocBufferCpy(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
+	if (!(objectInfo->vertex	= malloc(vertexCount * sizeof(Kdo_VkVertex)))
+	 || kdo_allocBufferCPU(&vk->core.buffer.vector3, (posCount + tangentCount + bitangentCount + normalCount) * sizeof(vec3))
+	 || kdo_allocBufferCPU(&vk->core.buffer.vector2, uvCount * sizeof(vec2))
+	 || kdo_allocBufferCPU(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
+	 || kdo_allocBufferCPU(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
 	 || kdo_allocImageCpy(&vk->core.buffer.texture, textureCount)
-	 || (!(objectInfo->posMatchArray		= calloc(posCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->tangentMatchArray	= calloc(tangentCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->bitangentMatchArray	= calloc(bitangentCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->normalMatchArray		= calloc(normalCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->uvMatchArray			= calloc(uvCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->materialMatchArray	= calloc(materialCount + 1, sizeof(uint32_t))))
-	 || (!(objectInfo->textureMatchArray	= calloc(textureCount + 1, sizeof(uint32_t)))))
+	 || (!(objectInfo->pos.matchArray		= calloc(posCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->tangent.matchArray	= calloc(tangentCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->bitangent.matchArray	= calloc(bitangentCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->normal.matchArray	= calloc(normalCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->uv.matchArray		= calloc(uvCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->material.matchArray	= calloc(materialCount + 1, sizeof(uint32_t))))
+	 || (!(objectInfo->texture.matchArray	= calloc(textureCount + 1, sizeof(uint32_t)))))
 		return (NULL);
-
 	glm_mat4_identity(objectInfo->object.modelMat);
 	glm_mat4_identity(objectInfo->object.normalMat);
-	objectInfo->freeVertexCount						= vertexCount;
-	objectInfo->freePosCount						= posCount;
-	objectInfo->freeTangentCount					= tangentCount;
-	objectInfo->freeBitangentCount					= bitangentCount;
-	objectInfo->freeNormalCount						= normalCount;
-	objectInfo->freeUvCount							= uvCount;
-	objectInfo->freeMaterialCount					= materialCount;
-	objectInfo->freeTextureCount					= textureCount;
+	objectInfo->vertexCount							= 0;
+	objectInfo->pos.freeCount						= posCount;
+	objectInfo->tangent.freeCount					= tangentCount;
+	objectInfo->bitangent.freeCount					= bitangentCount;
+	objectInfo->normal.freeCount					= normalCount;
+	objectInfo->uv.freeCount						= uvCount;
+	objectInfo->material.freeCount					= materialCount;
+	objectInfo->texture.freeCount					= textureCount;
 	objectInfo->object.drawCommand.vertexCount		= 0;
-	objectInfo->object.drawCommand.instanceCount	= 1;
-	objectInfo->object.drawCommand.firstVertex		= vk->core.buffer.vertex.countUpdate + vk->core.buffer.vertex.countNoUpdate;
+	objectInfo->object.drawCommand.instanceCount	= 0;
+	objectInfo->object.drawCommand.firstVertex		= 0;
 	objectInfo->object.drawCommand.firstInstance	= 0;
 
 	return (objectInfo);
@@ -304,136 +388,216 @@ Kdo_VkObjectInfo	*kdo_createObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_
 
 int	kdo_addPos(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freePosCount || !index)
+	if (!objectInfo->pos.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.vector3.BSTRoot, vk->core.buffer.vector3.bufferCpy, sizeof(vec3), &matchIndex, &pos)))
-		return (1);
-	if (matchIndex == vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate)
-		objectInfo->freePosCount--;
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.vector3, sizeof(vec3), &pos, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->pos.freeCount--;
 	
-	objectInfo->posMatchArray[index] = matchIndex;
+	objectInfo->pos.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freeTangentCount || !index)
+	if (!objectInfo->tangent.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.vector3.BSTRoot, vk->core.buffer.vector3.bufferCpy, sizeof(vec3), &matchIndex, &tangent)))
-		return (1);
-	if (matchIndex == vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate)
-		objectInfo->freeTangentCount--;
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.vector3, sizeof(vec3), &tangent, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->tangent.freeCount--;
 	
-	objectInfo->tangentMatchArray[index] = matchIndex;
+	objectInfo->tangent.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addBitangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freeBitangentCount || !index)
+	if (!objectInfo->bitangent.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.vector3.BSTRoot, vk->core.buffer.vector3.bufferCpy, sizeof(vec3), &matchIndex, bitangent)))
-		return (1);
-	if (matchIndex == vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate)
-		objectInfo->freeBitangentCount--;
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.vector3, sizeof(vec3), &bitangent, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->bitangent.freeCount--;
 	
-	objectInfo->bitangentMatchArray[index] = matchIndex;
+	objectInfo->bitangent.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addNormal(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freeNormalCount || !index)
+	if (!objectInfo->normal.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.vector3.BSTRoot, vk->core.buffer.vector3.bufferCpy, sizeof(vec3), &matchIndex, &normal)))
-		return (1);
-	if (matchIndex == vk->core.buffer.vector3.countUpdate + vk->core.buffer.vector3.countNoUpdate)
-		objectInfo->freeNormalCount--;
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.vector3, sizeof(vec3), &normal, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->normal.freeCount--;
 	
-	objectInfo->normalMatchArray[index] = matchIndex;
+	objectInfo->normal.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addUv(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2 uv)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freeUvCount || !index)
+	if (!objectInfo->uv.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.vector2.countUpdate + vk->core.buffer.vector2.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.vector2.BSTRoot, vk->core.buffer.vector2.bufferCpy, sizeof(vec2), &matchIndex, &uv)))
-		return (1);
-	if (matchIndex == vk->core.buffer.vector2.countUpdate + vk->core.buffer.vector2.countNoUpdate)
-		objectInfo->freeUvCount--;
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.vector2, sizeof(vec2), &uv, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->uv.freeCount--;
 	
-	objectInfo->uvMatchArray[index] = matchIndex;
-
-	return (0);
-}
-
-int	kdo_addMtl(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial mtl)
-{
-	uint32_t matchIndex;
-
-	if (!objectInfo->freeMaterialCount || !index)
-		return (1);
-
-	matchIndex = vk->core.buffer.material.countUpdate + vk->core.buffer.material.countNoUpdate;
-	if (!(kdo_BSTaddData(&vk->core.buffer.material.BSTRoot, vk->core.buffer.material.bufferCpy, sizeof(Kdo_VkMaterial), &matchIndex, &mtl)))
-		return (1);
-	if (matchIndex == vk->core.buffer.material.countUpdate + vk->core.buffer.material.countNoUpdate)
-		objectInfo->freeMaterialCount--;
-	
-	objectInfo->materialMatchArray[index] = matchIndex;
+	objectInfo->uv.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addTexture(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, char *path)
 {
-	uint32_t matchIndex;
+	int			returnCode;
+	uint32_t	matchIndex;
 
-	if (!objectInfo->freeTextureCount || !index)
+	if (!objectInfo->texture.freeCount || !index)
 		return (1);
 
-	matchIndex = vk->core.buffer.texture.countUpdate + vk->core.buffer.texture.countNoUpdate;
-	if (!(kdo_BSTaddStr(&vk->core.buffer.texture.BSTRoot, vk->core.buffer.texture.name, &matchIndex, basename(path))))
-		return (1);
-	if (matchIndex == vk->core.buffer.texture.countUpdate + vk->core.buffer.texture.countNoUpdate)
-		objectInfo->freeMaterialCount--;
+	returnCode	= kdo_addImageCPU(&vk->core.buffer.texture, path, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->texture.freeCount--;
 	
-	objectInfo->textureMatchArray[index] = matchIndex;
+	objectInfo->texture.matchArray[index] = matchIndex;
+
+	return (0);
+}
+
+int	kdo_addMaterial(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial material)
+{
+	int			returnCode;
+	uint32_t	matchIndex;
+
+	if (!objectInfo->material.freeCount || !index)
+		return (1);
+
+	material.ambientMap				= objectInfo->texture.matchArray[material.ambientMap];
+	material.diffuseMap				= objectInfo->texture.matchArray[material.diffuseMap];
+	material.specularMap			= objectInfo->texture.matchArray[material.specularMap];
+	material.emissiveMap			= objectInfo->texture.matchArray[material.emissiveMap];
+	material.transmittanceMap		= objectInfo->texture.matchArray[material.transmittanceMap];
+	material.transmissionFilterMap	= objectInfo->texture.matchArray[material.transmissionFilterMap];
+	material.shininessMap			= objectInfo->texture.matchArray[material.shininessMap];
+	material.refractionMap			= objectInfo->texture.matchArray[material.refractionMap];
+	material.disolveMap				= objectInfo->texture.matchArray[material.disolveMap];
+	material.bumpMap				= objectInfo->texture.matchArray[material.bumpMap];
+
+	returnCode	= kdo_addDataCPU(&vk->core.buffer.material, sizeof(Kdo_VkMaterial), &material, &index);
+	if (returnCode == -1)
+		kdo_cleanup(vk, ERRLOC, 12);
+	if (returnCode == 1)
+		objectInfo->material.freeCount--;
+	
+	objectInfo->material.matchArray[index] = matchIndex;
 
 	return (0);
 }
 
 int	kdo_addTriangle(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
 {
+	int			validUv;
+	vec3		rawTangent;
+
+	if (!vertex[0].posIndex || !vertex[1].posIndex || !vertex[2].posIndex)
+		return (1);
+
+	objectInfo->vertex[objectInfo->vertexCount + 0].posIndex			= objectInfo->pos.matchArray[vertex[0].posIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 1].posIndex			= objectInfo->pos.matchArray[vertex[1].posIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 2].posIndex			= objectInfo->pos.matchArray[vertex[2].posIndex];
+
+
+	validUv = vertex[0].uvIndex && vertex[1].uvIndex && vertex[2].uvIndex;
+
+	objectInfo->vertex[objectInfo->vertexCount + 0].uvIndex				= objectInfo->uv.matchArray[vertex[0].uvIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 1].uvIndex				= objectInfo->uv.matchArray[vertex[1].uvIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 2].uvIndex				= objectInfo->uv.matchArray[vertex[2].uvIndex];
+
+
+	if (!vertex[0].normalIndex || !vertex[1].normalIndex || !vertex[2].normalIndex)
+		objectInfo->normal.matchArray[0] = kdo_calculateNormal(vk, objectInfo, vertex);
+
+	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
+
+
+	if (validUv && (!vertex[0].tangentIndex || !vertex[1].tangentIndex || !vertex[2].tangentIndex))
+		kdo_calculateRawTangent(vk, vertex, rawTangent);
+
+	if (validUv && !vertex[0].tangentIndex)
+		objectInfo->vertex[objectInfo->vertexCount + 0].tangentIndex   = kdo_calculateTangent(vk, objectInfo, vertex[0], rawTangent);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 0].tangentIndex   = objectInfo->tangent.matchArray[vertex[0].tangentIndex];
+	if (validUv && !vertex[1].tangentIndex)
+		objectInfo->vertex[objectInfo->vertexCount + 1].tangentIndex   = kdo_calculateTangent(vk, objectInfo, vertex[1], rawTangent);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 1].tangentIndex   = objectInfo->tangent.matchArray[vertex[1].tangentIndex];
+	if (validUv && !vertex[2].tangentIndex)
+		objectInfo->vertex[objectInfo->vertexCount + 2].tangentIndex   = kdo_calculateTangent(vk, objectInfo, vertex[2], rawTangent);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 2].tangentIndex   = objectInfo->tangent.matchArray[vertex[2].tangentIndex];
+
+
+	if (!vertex[0].bitangentIndex)
+		 objectInfo->vertex[objectInfo->vertexCount + 0].bitangentIndex	= kdo_calculateBitangent(vk, objectInfo, vertex[0]);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 0].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[0].bitangentIndex];
+	if (!vertex[1].bitangentIndex)
+		 objectInfo->vertex[objectInfo->vertexCount + 1].bitangentIndex	= kdo_calculateBitangent(vk, objectInfo, vertex[1]);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 1].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[1].bitangentIndex];
+	if (!vertex[2].bitangentIndex)
+		 objectInfo->vertex[objectInfo->vertexCount + 2].bitangentIndex	= kdo_calculateBitangent(vk, objectInfo, vertex[2]);
+	else
+		objectInfo->vertex[objectInfo->vertexCount + 2].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[2].bitangentIndex];
+
+
+	objectInfo->vertex[objectInfo->vertexCount + 0].mtlIndex			= objectInfo->material.matchArray[vertex[0].mtlIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 1].mtlIndex			= objectInfo->material.matchArray[vertex[1].mtlIndex];
+	objectInfo->vertex[objectInfo->vertexCount + 2].mtlIndex			= objectInfo->material.matchArray[vertex[2].mtlIndex];
+
+	objectInfo->vertexCount += 3;
 
 	return (0);
 }
 
-void	kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info)
+void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info)
 {
 }

@@ -179,7 +179,7 @@ static void	kdo_freeBufferCPU(Kdo_VkBufferCoreElement *buffer, size_t freeSize)
 	buffer->sizeUsed	-= glm_min(buffer->sizeUsed, freeSize);
 }
 
-static int	kdo_allocImageCpy(Kdo_VkImageCoreElement *image, uint32_t needCount)
+static int	kdo_allocImageCPU(Kdo_VkImageCoreElement *image, uint32_t needCount)
 {
 	if (image->countFree < needCount)
 		if (!(image->nameCPU	= realloc(image->nameCPU, (image->countUsed + needCount) * sizeof(char *))))
@@ -190,7 +190,7 @@ static int	kdo_allocImageCpy(Kdo_VkImageCoreElement *image, uint32_t needCount)
 	return (0);
 }
 
-static void	kdo_freeImageCpy(Kdo_VkImageCoreElement *image, uint32_t freeCount)
+static void	kdo_freeImageCPU(Kdo_VkImageCoreElement *image, uint32_t freeCount)
 {
 	image->countFree	+= glm_min(image->countUsed, freeCount);	
 	image->countUsed	-= glm_min(image->countUsed, freeCount);
@@ -200,13 +200,13 @@ static int	kdo_addDataCPU(Kdo_VkBufferCoreElement *buffer, size_t sizeData, void
 {	
 	uint32_t	endIndex;
 
-	endIndex	= buffer->countUpdate + buffer->countNoUpdate;
+	endIndex	= buffer->sizeFill / sizeData;
 	*index		= endIndex;	
 	if (!(kdo_BSTaddData(&buffer->BSTRoot, buffer->bufferCPU, sizeData, index, data)))
 		return (-1);
 	if (*index == endIndex)
 	{
-		buffer->countNoUpdate++;
+		buffer->sizeFill += sizeData;
 		return (1);
 	}
 	return (0);
@@ -216,13 +216,13 @@ static int	kdo_addImageCPU(Kdo_VkImageCoreElement *image, char *path, uint32_t *
 {	
 	uint32_t	endIndex;
 
-	endIndex	= image->countUpdate + image->countNoUpdate;
+	endIndex	= image->countFill;
 	*index		= endIndex;	
 	if (!(kdo_BSTaddStr(&image->BSTRoot, image->nameCPU, index, basename(path))))
 		return (-1);
 	if (*index == endIndex)
 	{
-		image->countNoUpdate++;
+		image->countFill++;
 		return (1);
 	}
 	return (0);
@@ -293,7 +293,7 @@ static void	kdo_calculateRawTangent(Kdo_Vulkan *vk, Kdo_VkVertex vertex[3], vec3
 	glm_vec3_divs(rawTangent, factor, rawTangent);
 }
 
-uint32_t	kdo_calculateTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex, vec3 rawTangent)
+static uint32_t	kdo_calculateTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex, vec3 rawTangent)
 {
 	vec3			normal;
 	vec3            adjustVector;
@@ -349,7 +349,7 @@ Kdo_VkObjectInfo	*kdo_initObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t 
 {
 	Kdo_VkObjectInfo	*objectInfo;
 
-	if (MAX_TEXTURE < vk->core.buffer.texture.countUpdate + vk->core.buffer.texture.countNoUpdate + textureCount)
+	if (MAX_TEXTURE < vk->core.buffer.texture.countFill + textureCount)
 		return (NULL);
 	
 	if (!(objectInfo	= malloc(sizeof(Kdo_VkObjectInfo))))
@@ -359,7 +359,7 @@ Kdo_VkObjectInfo	*kdo_initObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t 
 	 || kdo_allocBufferCPU(&vk->core.buffer.vector2, uvCount * sizeof(vec2))
 	 || kdo_allocBufferCPU(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
 	 || kdo_allocBufferCPU(&vk->core.buffer.material, materialCount * sizeof(Kdo_VkMaterial))
-	 || kdo_allocImageCpy(&vk->core.buffer.texture, textureCount)
+	 || kdo_allocImageCPU(&vk->core.buffer.texture, textureCount)
 	 || (!(objectInfo->pos.matchArray		= calloc(posCount + 1, sizeof(uint32_t))))
 	 || (!(objectInfo->tangent.matchArray	= calloc(tangentCount + 1, sizeof(uint32_t))))
 	 || (!(objectInfo->bitangent.matchArray	= calloc(bitangentCount + 1, sizeof(uint32_t))))
@@ -386,7 +386,7 @@ Kdo_VkObjectInfo	*kdo_initObject(Kdo_Vulkan *vk, uint32_t vertexCount, uint32_t 
 	return (objectInfo);
 }
 
-int	kdo_addPos(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos)
+int	kdo_addPosObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -405,7 +405,7 @@ int	kdo_addPos(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec
 	return (0);
 }
 
-int	kdo_addTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent)
+int	kdo_addTangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -424,7 +424,7 @@ int	kdo_addTangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index,
 	return (0);
 }
 
-int	kdo_addBitangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent)
+int	kdo_addBitangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -443,7 +443,7 @@ int	kdo_addBitangent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t inde
 	return (0);
 }
 
-int	kdo_addNormal(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal)
+int	kdo_addNormalObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -462,7 +462,7 @@ int	kdo_addNormal(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, 
 	return (0);
 }
 
-int	kdo_addUv(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2 uv)
+int	kdo_addUvObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2 uv)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -481,7 +481,7 @@ int	kdo_addUv(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2
 	return (0);
 }
 
-int	kdo_addTexture(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, char *path)
+int	kdo_addTextureObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, char *path)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -500,7 +500,7 @@ int	kdo_addTexture(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index,
 	return (0);
 }
 
-int	kdo_addMaterial(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial material)
+int	kdo_addMaterialObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial material)
 {
 	int			returnCode;
 	uint32_t	matchIndex;
@@ -530,7 +530,7 @@ int	kdo_addMaterial(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index
 	return (0);
 }
 
-int	kdo_addTriangle(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
+int	kdo_addTriangleObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
 {
 	int			validUv;
 	vec3		rawTangent;
@@ -598,6 +598,13 @@ int	kdo_addTriangle(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex v
 	return (0);
 }
 
+void	kdo_updateBufferGPU(Kdo_Vulkan *vk, Kdo_VkBufferCoreElement *buffer)
+{
+	if (buffer->bufferGPU.sizeUsed + buffer->bufferGPU.sizeFree < buffer->sizeFill)	
+
+}
+
 void	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info)
 {
+
 }

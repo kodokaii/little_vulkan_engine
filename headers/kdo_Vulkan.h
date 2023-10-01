@@ -19,8 +19,6 @@
 # define GLFW_INCLUDE_VULKAN
 # include <GLFW/glfw3.h>
 
-# include "kdo_VkBST.h"
-
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
@@ -36,16 +34,6 @@
 # define DEFAULT_TEXTURE	"textures/default.png"
 
 # define ERRLOC				"CPU Memory allocation error"
-
-typedef enum Kdo_VkWait
-{
-	WAIT_DEVICE	= 0x00000001
-}	Kdo_VkWait;
-
-typedef enum Kdo_VkStatus
-{
-	INVISIBLE	= 0x00000001
-}	Kdo_VkStatus;
 
 typedef struct Kdo_VkMaterial
 {
@@ -129,7 +117,10 @@ typedef struct Kdo_SynImage
 }	Kdo_SynImage;
 
 typedef struct Kdo_VkQueueInfo
-{ uint32_t		count; float			priority; VkQueueFlags	requiredFlags; VkQueueFlags	noRequiredFlags;
+{	uint32_t		count;
+	float			priority;
+	VkQueueFlags	requiredFlags;
+	VkQueueFlags	noRequiredFlags;
 	VkQueueFlags	preferredFlags;
 	VkQueueFlags	noPreferredFlags;
 	VkBool32		presentSupport;
@@ -191,7 +182,10 @@ typedef struct Kdo_VkPhysicalDevice
 	VkPhysicalDevice					path;
 	VkPhysicalDeviceProperties			properties;
 	VkPhysicalDeviceFeatures			features;
-	Kdo_VkSwapChainProperties			swapChainProperties; Kdo_VkQueueProperties				queueProperties; VkPhysicalDeviceMemoryProperties	memProperties; }	Kdo_VkPhysicalDevice;
+	Kdo_VkSwapChainProperties			swapChainProperties;
+	Kdo_VkQueueProperties				queueProperties;
+	VkPhysicalDeviceMemoryProperties	memProperties;
+}	Kdo_VkPhysicalDevice;
 
 typedef struct Kdo_VkDevice
 {
@@ -241,91 +235,17 @@ typedef struct Kdo_VkFence
 	VkFence	*renderFinished;
 }	Kdo_VkFence;
 
-typedef struct Kdo_VkBufferProperties
-{
-	VkBufferUsageFlags		usage;
-	VkMemoryPropertyFlags	memoryFlags;
-	Kdo_VkWait				waitFlags;
-}	Kdo_VkBufferProperties;
-
-typedef struct Kdo_VkBuffer
-{
-	Kdo_VkBufferProperties	properties;
-	VkBuffer				buffer;
-	VkDeviceMemory			memory;
-	VkDeviceSize			sizeUsed;
-	VkDeviceSize			sizeFree;
-}	Kdo_VkBuffer;
-
-typedef struct Kdo_VkImageProperties
-{
-	VkImageLayout			layout;
-	VkMemoryPropertyFlags	memoryFlags;
-	uint32_t				memoryFilter;
-	Kdo_VkWait				waitFlags;
-}	Kdo_VkImageProperties;
-
-typedef struct Kdo_VkImage
-{
-	VkExtent3D				extent;
-	VkDeviceSize			size;
-	VkImage					image;
-	VkImageView				view;
-}	Kdo_VkImage;
-
-typedef	struct Kdo_VkImageBuffer
-{
-	Kdo_VkImageProperties	properties;
-	VkDeviceMemory			memory;
-	VkDeviceSize			sizeUsed;
-	VkDeviceSize			sizeFree;
-	uint32_t				imageCount;
-	Kdo_VkImage				*image;
-}	Kdo_VkImageBuffer;
-
-typedef	struct Kdo_VkBufferCoreElement
-{
-	Kdo_VkBuffer	bufferGPU;
-	void			*bufferCPU;
-	Kdo_BST			*BSTRoot;
-	size_t			sizeUsed;
-	size_t			sizeFree;
-	uint32_t		countUpdate;
-	uint32_t		countNoUpdate;
-}	Kdo_VkBufferCoreElement;
-
-typedef	struct Kdo_VkImageCoreElement
-{
-	Kdo_VkImageBuffer	imageGPU;
-	char				**nameCPU;
-	Kdo_BST				*BSTRoot;
-	uint32_t			countUsed;
-	uint32_t			countFree;
-	uint32_t			countUpdate;
-	uint32_t			countNoUpdate;
-}	Kdo_VkImageCoreElement;
-
 typedef struct Kdo_VkBufferCore
 {
-	Kdo_VkBufferCoreElement		vector3;
-	Kdo_VkBufferCoreElement		vector2;
-	Kdo_VkBufferCoreElement		material;
-	Kdo_VkBufferCoreElement		light;
-	Kdo_VkImageCoreElement		texture;
-	Kdo_VkBuffer				vertex;
-	Kdo_VkBuffer				object;
-	uint32_t					objectCount;
+	Kdo_VkBufferSet			vector3;
+	Kdo_VkBufferSet			vector2;
+	Kdo_VkBufferSet			material;
+	Kdo_VkBufferImageSet	texture;
+	Kdo_VkBuffer			light;
+	Kdo_VkBuffer			vertex;
+	Kdo_VkBuffer			object;
+	uint32_t				objectCount;
 }	Kdo_VkBufferCore;
-
-typedef struct Kdo_VkBufferCoreCount
-{
-	uint32_t	vertex;
-	uint32_t	vector3;
-	uint32_t	vector2;
-	uint32_t	material;
-	uint32_t	light;
-	uint32_t	object;
-}	Kdo_VkBufferCoreCount;
 
 typedef struct Kdo_VkSampler
 {

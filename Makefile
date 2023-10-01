@@ -28,7 +28,7 @@ MAIN_O 		= $(MAIN:.c=.o)
 
 all: $(EXEC)
 
-debug: debug_flags $(EXEC) 
+debug: fclean debug_flags all 
 	$(DEBUGGER) debug
 
 debug_flags:
@@ -54,4 +54,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY:		all debug clean fclean re
+.PHONY:		all debug debug_flags clean fclean re

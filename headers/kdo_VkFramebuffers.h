@@ -13,6 +13,7 @@
 # define KDO_VKFRAMEBUFFERS_H
 
 # include "kdo_Vulkan.h"
+# include "kdo_VkMemory.h"
 
 void	kdo_initFramebuffers(Kdo_Vulkan *vk);
 

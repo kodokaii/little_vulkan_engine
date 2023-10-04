@@ -22,6 +22,7 @@
 # include <stdlib.h>
 # include <stdio.h>
 # include <string.h>
+# include "kdo_VkBuffer.h"
 
 # define SZ_SHADER			2
 
@@ -30,10 +31,9 @@
 # define GRAPHIC_QUEUE		1
 # define TRANSFER_QUEUE		2
 
-#define MAX_TEXTURE			32
-# define DEFAULT_TEXTURE	"textures/default.png"
+# define MAX_TEXTURE		32
 
-# define ERRLOC				"CPU Memory allocation error"
+# define KDO_VK_ALLOC(ptr, alloc)	if (!(ptr = alloc)) kdo_cleanup(vk, "CPU Memory allocation error", 12)
 
 typedef struct Kdo_VkMaterial
 {
@@ -184,7 +184,7 @@ typedef struct Kdo_VkPhysicalDevice
 	VkPhysicalDeviceFeatures			features;
 	Kdo_VkSwapChainProperties			swapChainProperties;
 	Kdo_VkQueueProperties				queueProperties;
-	VkPhysicalDeviceMemoryProperties	memProperties;
+	VkPhysicalDeviceMemoryProperties	memoryProperties;
 }	Kdo_VkPhysicalDevice;
 
 typedef struct Kdo_VkDevice
@@ -237,10 +237,10 @@ typedef struct Kdo_VkFence
 
 typedef struct Kdo_VkBufferCore
 {
-	Kdo_VkBufferSet			vector3;
-	Kdo_VkBufferSet			vector2;
-	Kdo_VkBufferSet			material;
-	Kdo_VkBufferImageSet	texture;
+	Kdo_VkSetBuffer			vector3;
+	Kdo_VkSetBuffer			vector2;
+	Kdo_VkSetBuffer			material;
+	Kdo_VkSetImageBuffer	texture;
 	Kdo_VkBuffer			light;
 	Kdo_VkBuffer			vertex;
 	Kdo_VkBuffer			object;

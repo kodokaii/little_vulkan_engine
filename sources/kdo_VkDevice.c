@@ -50,7 +50,7 @@ static uint32_t	kdo_findQueueFamilyIndex(Kdo_Vulkan *vk, Kdo_VkQueueInfo info)
 		vk->physicalDevice.queueProperties.path[index].queueCount--;
 		return (index);
 	}
-	kdo_cleanup(vk, "Couldn't find queue family", 5);
+	kdo_cleanup(vk, "Couldn't find queue family", 6);
 	return (5);
 }
 
@@ -78,8 +78,7 @@ static uint32_t	kdo_createQueueInfo(Kdo_Vulkan *vk, VkDeviceQueueCreateInfo **qu
 		}
 	}
 
-	if (!(*queueCreateInfo = malloc(uniqueIndexCount * sizeof(VkDeviceQueueCreateInfo))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(*queueCreateInfo, malloc(uniqueIndexCount * sizeof(VkDeviceQueueCreateInfo)));
 	
 	l = 0;
 	for (i = 0; i < QUEUES_COUNT; i++)
@@ -130,7 +129,7 @@ void    kdo_initDevice(Kdo_Vulkan *vk)
 	deviceInfo.ppEnabledExtensionNames	= vk->info.deviceExtensions;
 	deviceInfo.pEnabledFeatures			= &deviceFeatures;
 	if (vkCreateDevice(vk->physicalDevice.path, &deviceInfo, NULL, &vk->device.path) != VK_SUCCESS)
-		kdo_cleanup(vk, "Logical device creation failed", 6);
+		kdo_cleanup(vk, "Logical device creation failed", 7);
 	
 	free(queueCreateInfo);
 

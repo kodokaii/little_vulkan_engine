@@ -21,10 +21,10 @@ static void	kdo_readSpirV(Kdo_Vulkan *vk, const char *fileName, Kdo_Shader *shad
 	shader->codeSize = ftell(file);
 	rewind(file);
 
-	if (!(shader->code = malloc(shader->codeSize * sizeof(char))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(shader->code, malloc(shader->codeSize * sizeof(char)));
+
 	if (!(fread(shader->code, shader->codeSize, 1, file)))
-		kdo_cleanup(vk, "Error while reading the shader", 32);
+		kdo_cleanup(vk, "Error while reading the shader", 11);
 
 	fclose(file);
 }
@@ -39,7 +39,7 @@ static void kdo_createShaderModule(Kdo_Vulkan *vk, Kdo_Shader *shader)
 	moduleInfo.codeSize		= shader->codeSize;
 	moduleInfo.pCode		= (uint32_t*) shader->code;
 	if (vkCreateShaderModule(vk->device.path, &moduleInfo, NULL, &shader->module) != VK_SUCCESS)
-		kdo_cleanup(vk, "Create shader module failed", 10);
+		kdo_cleanup(vk, "Create shader module failed", 13);
 }
 
 static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
@@ -69,7 +69,7 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 
 	descriptorSetBinding[3].binding				= 3;
 	descriptorSetBinding[3].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorSetBinding[3].descriptorCount		= MAX_TEXTURES;
+	descriptorSetBinding[3].descriptorCount		= MAX_TEXTURE;
 	descriptorSetBinding[3].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[3].pImmutableSamplers	= NULL;
 
@@ -90,7 +90,7 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 	descriptorSetInfo.bindingCount	= 6;
 	descriptorSetInfo.pBindings		= descriptorSetBinding;
 	if (vkCreateDescriptorSetLayout(vk->device.path, &descriptorSetInfo, NULL, &vk->graphicsPipeline.descriptorLayout) != VK_SUCCESS)
-		kdo_cleanup(vk, "Descriptor layout creation failed", 11);
+		kdo_cleanup(vk, "Descriptor layout creation failed", 14);
 
 	constantsRange.stageFlags	= VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	constantsRange.offset		= 0;
@@ -104,7 +104,7 @@ static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 	pipelineLayoutInfo.pushConstantRangeCount		= 1;
 	pipelineLayoutInfo.pPushConstantRanges			= &constantsRange;
 	if (vkCreatePipelineLayout(vk->device.path, &pipelineLayoutInfo, NULL, &vk->graphicsPipeline.layout) != VK_SUCCESS)
-		kdo_cleanup(vk, "Pipeline layout creation failed", 13);
+		kdo_cleanup(vk, "Pipeline layout creation failed", 15);
 }
 
 void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
@@ -303,7 +303,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	graphicsPipelineInfo.basePipelineHandle		= VK_NULL_HANDLE;
 	graphicsPipelineInfo.basePipelineIndex		= -1;
 	if (vkCreateGraphicsPipelines(vk->device.path, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, NULL, &vk->graphicsPipeline.path) != VK_SUCCESS)
-			kdo_cleanup(vk, "Graphics pipeline creation failed", 15);
+			kdo_cleanup(vk, "Graphics pipeline creation failed", 16);
 
 	KDO_FREE(vk->graphicsPipeline.vertexShader.code)
 	KDO_FREE(vk->graphicsPipeline.fragmentShader.code)

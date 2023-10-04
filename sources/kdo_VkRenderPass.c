@@ -79,5 +79,5 @@ void	kdo_initRenderPass(Kdo_Vulkan *vk)
 	renderPassInfo.dependencyCount	= 1;
 	renderPassInfo.pDependencies	= &dependency;
 	if (vkCreateRenderPass(vk->device.path, &renderPassInfo, NULL, &vk->renderPass.path) != VK_SUCCESS)
-		kdo_cleanup(vk, "Render pass creation failed", 7);
+		kdo_cleanup(vk, "Render pass creation failed", 10);
 }

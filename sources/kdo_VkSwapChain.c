@@ -72,10 +72,8 @@ void	kdo_initViewsSwapChain(Kdo_Vulkan *vk)
 	VkImageViewCreateInfo		viewInfo;
 
 	vkGetSwapchainImagesKHR(vk->device.path, vk->swapChain.path, &vk->swapChain.imagesCount, NULL);
-	if (!(vk->swapChain.images = malloc(vk->swapChain.imagesCount * sizeof(VkImage))))
-		kdo_cleanup(vk, ERRLOC, 12);
-	if (!(vk->swapChain.views = malloc(vk->swapChain.imagesCount * sizeof(VkImageView))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(vk->swapChain.images, malloc(vk->swapChain.imagesCount * sizeof(VkImage)));
+	KDO_VK_ALLOC(vk->swapChain.views, malloc(vk->swapChain.imagesCount * sizeof(VkImageView)));
 	vkGetSwapchainImagesKHR(vk->device.path, vk->swapChain.path, &vk->swapChain.imagesCount, vk->swapChain.images);
 
 
@@ -97,7 +95,7 @@ void	kdo_initViewsSwapChain(Kdo_Vulkan *vk)
 		viewInfo.subresourceRange.baseArrayLayer	= 0;
 		viewInfo.subresourceRange.layerCount		= 1;
 		if (vkCreateImageView(vk->device.path, &viewInfo, NULL, vk->swapChain.views + i) != VK_SUCCESS)
-			kdo_cleanup(vk, "Views SwapChain creation failed", 7);
+			kdo_cleanup(vk, "Views SwapChain creation failed", 9);
 	}
 }
 
@@ -127,7 +125,7 @@ void	kdo_initSwapChain(Kdo_Vulkan *vk)
 	swapChainInfo.clipped				= VK_TRUE;
 	swapChainInfo.oldSwapchain			= vk->swapChain.old;
 	if (vkCreateSwapchainKHR(vk->device.path, &swapChainInfo, NULL, &vk->swapChain.path) != VK_SUCCESS)
-		kdo_cleanup(vk, "SwapChain creation failed", 6);
+		kdo_cleanup(vk, "SwapChain creation failed", 8);
 
 	kdo_freePhysicalDevice(vk);
 }

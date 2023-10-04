@@ -14,93 +14,6 @@
 #define FAST_OBJ_IMPLEMENTATION
 #include "objLoader/fast_obj.h"
 
-static uint32_t	kdo_sortMesh(Kdo_Vertex *vertex, uint32_t toSortCount, uint32_t *sortIndex, uint32_t *index)
-{
-	uint32_t	beforeCount	= 0;
-	uint32_t	sameCount	= 1;
-	uint32_t	afterCount	= 0;
-	uint32_t	buffer;
-	float		res;
-
-	while (beforeCount + sameCount + afterCount < toSortCount)
-	{
-		res = kdo_vertexCmp(vertex[sortIndex[beforeCount]], vertex[sortIndex[beforeCount + sameCount]]);
-
-		if (res < 0)
-		{
-			buffer											= sortIndex[beforeCount];
-			sortIndex[beforeCount]							= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]				= buffer;
-
-			index[sortIndex[beforeCount]]					-= sameCount;
-			index[sortIndex[beforeCount + sameCount]]		+= sameCount;
-
-			beforeCount++;
-		}
-		else if (0 < res)
-		{
-			buffer											= sortIndex[beforeCount + sameCount];
-			sortIndex[beforeCount + sameCount]				= sortIndex[toSortCount - afterCount - 1];
-			sortIndex[toSortCount - afterCount - 1]			= buffer;
-
-			index[sortIndex[beforeCount + sameCount]]		-= toSortCount - afterCount - beforeCount - sameCount - 1;
-			index[sortIndex[toSortCount - afterCount - 1]]	+= toSortCount - afterCount - beforeCount - sameCount - 1;
-
-			afterCount++;
-		}
-		else
-			sameCount++;
-	}
-
-	if (1 < beforeCount)
-		sameCount += kdo_sortMesh(vertex, beforeCount, sortIndex, index);
-	if (1 < afterCount)
-		sameCount += kdo_sortMesh(vertex, afterCount, &sortIndex[toSortCount - afterCount], index);
-
-	return (sameCount - 1);
-}
-
-
-static uint32_t	kdo_splitMesh(Kdo_Vulkan *vk, Kdo_Vertex *vertexIn, uint32_t vertexInCount, Kdo_Vertex **vertexOut, uint32_t **indexOut)
-{
-	uint32_t	*sortVertexIndex;
-	uint32_t	vertexOutCount;
-	uint32_t	currentVertexIn;
-	uint32_t	currentVertexOut;
-	uint32_t	currentSameVertexCount;
-
-	if (!(*indexOut			= malloc(vertexInCount * sizeof(uint32_t))))
-			kdo_cleanup(vk, ERRLOC, 12);
-	if (!(sortVertexIndex	= malloc(vertexInCount * sizeof(uint32_t))))
-			kdo_cleanup(vk, ERRLOC, 12);
-
-	for (uint32_t i = 0; i < vertexInCount; i++)
-	{
-		(*indexOut)[i]		= i;
-		sortVertexIndex[i]	= i;
-	}
-	vertexOutCount = vertexInCount - kdo_sortMesh(vertexIn, vertexInCount, sortVertexIndex, *indexOut);
-	if (!(*vertexOut = malloc(vertexOutCount * sizeof(Kdo_Vertex))))
-		kdo_cleanup(vk, ERRLOC, 12);
-
-	currentVertexIn = 1;
-	currentVertexOut = 1;
-	currentSameVertexCount = 0;
-	(*vertexOut)[0] = vertexIn[sortVertexIndex[0]];
-	while (currentVertexIn < vertexInCount)
-	{
-		if (kdo_vertexCmp(vertexIn[sortVertexIndex[currentVertexIn]], vertexIn[sortVertexIndex[currentVertexIn - 1]]))
-			(*vertexOut)[currentVertexOut++] = vertexIn[sortVertexIndex[currentVertexIn]];
-		else
-			currentSameVertexCount++;
-		(*indexOut)[sortVertexIndex[currentVertexIn]] -= currentSameVertexCount;
-		currentVertexIn++;
-	}
-
-	free(sortVertexIndex);
-	return (vertexOutCount);
-}
-
 static void kdo_findNormal(vec3 vertice1, vec3 vertice2, vec3 vertice3, vec3 *normal)
 {
 	vec3	x;
@@ -308,7 +221,7 @@ void	kdo_initCore(Kdo_Vulkan *vk)
 	commandPoolInfo.queueFamilyIndex    = vk->device.queues[TRANSFER_QUEUE].familyIndex;
 	if (vkCreateCommandPool(vk->device.path, &commandPoolInfo, NULL, &vk->core.transferPool) != VK_SUCCESS)
 
-		kdo_cleanup(vk, "Transfer pool creation failed", 33);
+		kdo_cleanup(vk, "Transfer pool creation failed", 22);
 	
 	vk->core.buffer.textures		= kdo_newImageBuffer(vk, TEXTURE_BUFFER_SIZE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, findTextureMemoryFiltrer(vk), WAIT_DEVICE);
 	vk->core.buffer.vertex			= kdo_newBuffer(vk, VERTEX_BUFFER_SIZE, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, WAIT_DEVICE);

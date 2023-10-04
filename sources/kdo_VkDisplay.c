@@ -145,8 +145,7 @@ void	kdo_initRenderPool(Kdo_Vulkan *vk)
 	VkCommandPoolCreateInfo			commandPoolInfo;
 	VkCommandBufferAllocateInfo		bufferAllocInfo;
 
-	if (!(vk->display.renderPool = malloc(vk->swapChain.imagesCount * sizeof(Kdo_VkRenderPool))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(vk->display.renderPool, malloc(vk->swapChain.imagesCount * sizeof(Kdo_VkRenderPool)));
 
 	commandPoolInfo.sType				= VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolInfo.pNext				= NULL;

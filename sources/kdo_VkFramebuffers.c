@@ -36,15 +36,15 @@ static void	kdo_initDepthBuffer(Kdo_Vulkan *vk)
 	imageInfo.pQueueFamilyIndices	= NULL;
 	imageInfo.initialLayout			= VK_IMAGE_LAYOUT_UNDEFINED;
 	if (vkCreateImage(vk->device.path, &imageInfo, NULL, &vk->framebuffer.depth.image) != VK_SUCCESS)
-		kdo_cleanup(vk, "Depth image creation failed", 16);
+		kdo_cleanup(vk, "Depth image creation failed", 17);
 
 	vkGetImageMemoryRequirements(vk->device.path, vk->framebuffer.depth.image, &memRequirements);
 	allocInfo.sType				= VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.pNext				= NULL;
 	allocInfo.allocationSize	= memRequirements.size;
-	allocInfo.memoryTypeIndex	= kdo_findMemoryType(vk, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	allocInfo.memoryTypeIndex	= kdo_vkFindMemoryType(vk, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	if (vkAllocateMemory(vk->device.path, &allocInfo, NULL, &vk->framebuffer.depth.memory) != VK_SUCCESS)
-		kdo_cleanup(vk, "Depth memory allocation failed", 17);
+		kdo_cleanup(vk, "Depth memory allocation failed", 18);
 
 	vkBindImageMemory(vk->device.path, vk->framebuffer.depth.image, vk->framebuffer.depth.memory, 0);
 
@@ -64,7 +64,7 @@ static void	kdo_initDepthBuffer(Kdo_Vulkan *vk)
 	viewInfo.subresourceRange.baseArrayLayer    = 0;
 	viewInfo.subresourceRange.layerCount        = 1;
 	if (vkCreateImageView(vk->device.path, &viewInfo, NULL, &vk->framebuffer.depth.view) != VK_SUCCESS)
-		kdo_cleanup(vk, "Depth view creation failed", 18);
+		kdo_cleanup(vk, "Depth view creation failed", 19);
 }
 
 void    kdo_initFramebuffers(Kdo_Vulkan *vk)
@@ -73,8 +73,7 @@ void    kdo_initFramebuffers(Kdo_Vulkan *vk)
 
 	kdo_initDepthBuffer(vk);
 
-	if (!(vk->framebuffer.path = malloc(vk->swapChain.imagesCount * sizeof(VkFramebuffer))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(vk->framebuffer.path, malloc(vk->swapChain.imagesCount * sizeof(VkFramebuffer)));
 
 	for (uint32_t i = 0; i < vk->swapChain.imagesCount; i++)
 	{
@@ -90,6 +89,6 @@ void    kdo_initFramebuffers(Kdo_Vulkan *vk)
 		framebufferInfo.layers = 1;
 
 		if (vkCreateFramebuffer(vk->device.path, &framebufferInfo, NULL, vk->framebuffer.path + i) != VK_SUCCESS)
-			kdo_cleanup(vk, "Framebuffer creation failed", 19);
+			kdo_cleanup(vk, "Framebuffer creation failed", 20);
 	}
 }

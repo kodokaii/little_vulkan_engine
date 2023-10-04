@@ -35,8 +35,8 @@ void	kdo_initGlfw(Kdo_Vulkan *vk)
 //	glfwSetInputMode (vk->window.path, GLFW_CURSOR , GLFW_CURSOR_DISABLED);
 
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionsCount);
-	if (!(extensions = malloc((vk->info.instanceExtensionsCount + glfwExtensionsCount) * sizeof(char *))))
-		kdo_cleanup(vk, ERRLOC, 12);
+	KDO_VK_ALLOC(extensions, malloc((vk->info.instanceExtensionsCount + glfwExtensionsCount) * sizeof(char *)));
+
 	memcpy(extensions, vk->info.instanceExtensions, vk->info.instanceExtensionsCount * sizeof(char *));
 	memcpy(extensions + vk->info.instanceExtensionsCount, glfwExtensions, glfwExtensionsCount * sizeof(char *));
 	vk->info.instanceExtensions			= (const char **) extensions;

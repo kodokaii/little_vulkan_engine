@@ -24,14 +24,14 @@
 # include <string.h>
 # include "kdo_VkBuffer.h"
 
-# define SZ_SHADER			2
+# define SZ_SHADER				2
 
-# define QUEUES_COUNT		3
-# define PRESENT_QUEUE		0
-# define GRAPHIC_QUEUE		1
-# define TRANSFER_QUEUE		2
+# define QUEUES_COUNT			3
+# define PRESENT_QUEUE			0
+# define GRAPHIC_QUEUE			1
+# define TRANSFER_QUEUE			2
 
-# define MAX_TEXTURE		32
+# define MAX_TEXTURE			32
 
 # define KDO_VK_ALLOC(ptr, alloc)	if (!(ptr = alloc)) kdo_cleanup(vk, "CPU Memory allocation error", 12)
 
@@ -244,7 +244,6 @@ typedef struct Kdo_VkBufferCore
 	Kdo_VkBuffer			light;
 	Kdo_VkBuffer			vertex;
 	Kdo_VkBuffer			object;
-	uint32_t				objectCount;
 }	Kdo_VkBufferCore;
 
 typedef struct Kdo_VkSampler
@@ -254,11 +253,12 @@ typedef struct Kdo_VkSampler
 
 typedef struct Kdo_VkCore
 {
-	VkCommandPool			transferPool;
-	VkDescriptorPool		descriptorPool;
-	VkDescriptorSet			descriptorSet;
-	Kdo_VkBufferCore		buffer;
-	Kdo_VkSampler			sampler;
+	VkCommandPool		transferPool;
+	VkDescriptorPool	descriptorPool;
+	VkDescriptorSet		descriptorSet;
+	Kdo_VkSampler		sampler;
+	Kdo_VkBufferCore	buffer;
+	uint32_t			objectCount;
 }	Kdo_VkCore;
 
 typedef struct Kdo_VkRenderPool

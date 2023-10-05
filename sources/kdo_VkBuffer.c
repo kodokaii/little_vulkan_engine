@@ -116,7 +116,17 @@ VkResult		kdo_newCPUBuffer(VkDeviceSize size, Kdo_VkCPUBuffer *buffer)
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_newBSTNode(uint32_t index, Kdo_VkBSTNode **node)
+VkResult		kdo_newCPUImageBuffer(uint32_t	maxImageCount, Kdo_VkCPUImageBuffer *imageBuffer)
+{
+	if (!(imageBuffer->path	= calloc(maxImageCount, sizeof(char *))))
+		return (VK_ERROR_OUT_OF_HOST_MEMORY);
+	imageBuffer->maxImageCount	= maxImageCount;
+	imageBuffer->imageCount		= 0;
+
+	return (VK_SUCCESS);
+}
+
+VkResult	kdo_newBSTNode(uint32_t index, Kdo_VkBSTNode **node)
 {
 	if (!(*node = malloc(sizeof(Kdo_VkBSTNode))))
 		return (VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -127,7 +137,7 @@ VkResult		kdo_newBSTNode(uint32_t index, Kdo_VkBSTNode **node)
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_newBST(VkDeviceSize elementSize, Kdo_VkCPUBuffer *CPUBuffer, Kdo_VkBST *bst)
+VkResult	kdo_newBST(VkDeviceSize elementSize, Kdo_VkCPUBuffer *CPUBuffer, Kdo_VkBST *bst)
 {
 	bst->root			= NULL;
 	bst->CPUBuffer		= CPUBuffer;
@@ -136,7 +146,15 @@ VkResult		kdo_newBST(VkDeviceSize elementSize, Kdo_VkCPUBuffer *CPUBuffer, Kdo_V
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_newBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkBufferCreateInfo *bufferInfo, Kdo_VkBuffer *buffer)
+VkResult	kdo_newImageBST(Kdo_VkCPUImageBuffer *CPUImageBuffer, Kdo_VkImageBST *imageBst)
+{
+	imageBst->root				= NULL;
+	imageBst->CPUImageBuffer	= CPUImageBuffer;
+
+	return (VK_SUCCESS);
+}
+
+VkResult	kdo_newBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkBufferCreateInfo *bufferInfo, Kdo_VkBuffer *buffer)
 {
 	VkResult	returnCode;
 
@@ -146,7 +164,7 @@ VkResult		kdo_newBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memory
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_newSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize elementSize, VkBufferCreateInfo *bufferInfo, Kdo_VkSetBuffer *buffer)
+VkResult	kdo_newSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize elementSize, VkBufferCreateInfo *bufferInfo, Kdo_VkSetBuffer *buffer)
 {
 	VkResult	returnCode;
 
@@ -157,19 +175,19 @@ VkResult		kdo_newSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties mem
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_newSetImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize size, uint32_t maxImageCount, VkImageCreateInfo  *imageInfo, Kdo_VkSetImageBuffer *imageBuffer)
+VkResult	kdo_newSetImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize size, uint32_t maxImageCount, VkImageCreateInfo  *imageInfo, Kdo_VkSetImageBuffer *imageBuffer)
 {
 	VkResult	returnCode;
 
 	KDO_VK_ASSERT(kdo_newGPUImageBuffer(device, memoryProperties, memoryFlags, waitFlags, size, maxImageCount, imageInfo, &imageBuffer->GPU));
-	KDO_VK_ASSERT(kdo_newCPUBuffer(size, &imageBuffer->CPU));
-	KDO_VK_ASSERT(kdo_newBST(sizeof(char *), &imageBuffer->CPU, &imageBuffer->BST));
+	KDO_VK_ASSERT(kdo_newCPUImageBuffer(maxImageCount, &imageBuffer->CPU));
+	KDO_VK_ASSERT(kdo_newImageBST(&imageBuffer->CPU, &imageBuffer->BST));
 
 	return (VK_SUCCESS);
 }
 
 
-void		kdo_freeGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory)
+void	kdo_freeGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory)
 {
 	if (memory->waitFlags & WAIT_DEVICE)
 		vkDeviceWaitIdle(device);
@@ -177,21 +195,21 @@ void		kdo_freeGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory)
 	memory->size	= 0;
 }
 
-void		kdo_freeGPUBuffer(VkDevice device, Kdo_VkGPUBuffer *buffer)
+void	kdo_freeGPUBuffer(VkDevice device, Kdo_VkGPUBuffer *buffer)
 {
 	KDO_DESTROY(vkDestroyBuffer, device, buffer->path);
 	kdo_freeGPUMemory(device, &buffer->memory);
 	buffer->fillSize	= 0;
 }
 
-void		kdo_freeGPUImage(VkDevice device, Kdo_VkGPUImage *image)
+void	kdo_freeGPUImage(VkDevice device, Kdo_VkGPUImage *image)
 {
 	KDO_DESTROY(vkDestroyImageView, device, image->view);
 	KDO_DESTROY(vkDestroyImage, device, image->path);
 	image->size	= 0;
 }
 
-void		kdo_freeGPUImageBuffer(VkDevice device, Kdo_VkGPUImageBuffer *imageBuffer)
+void	kdo_freeGPUImageBuffer(VkDevice device, Kdo_VkGPUImageBuffer *imageBuffer)
 {
 	for (uint32_t i = 0; i < imageBuffer->imageCount; i++)
 		kdo_freeGPUImage(device, &imageBuffer->imageArray[i]);
@@ -202,14 +220,23 @@ void		kdo_freeGPUImageBuffer(VkDevice device, Kdo_VkGPUImageBuffer *imageBuffer)
 	imageBuffer->imageCount		= 0;
 }
 
-void		kdo_freeCPUBuffer(Kdo_VkCPUBuffer *buffer)
+void	kdo_freeCPUBuffer(Kdo_VkCPUBuffer *buffer)
 {
 	KDO_FREE(buffer->path);
 	buffer->size		= 0;
 	buffer->fillSize	= 0;
 }
 
-void		kdo_freeBSTNode(Kdo_VkBSTNode **node)
+void	kdo_freeCPUImageBuffer(Kdo_VkCPUImageBuffer *imageBuffer)
+{
+	for (uint32_t i = 0; i < imageBuffer->imageCount; i++)
+		KDO_FREE(imageBuffer->path[i]);
+	KDO_FREE(imageBuffer->path);
+	imageBuffer->maxImageCount	= 0;
+	imageBuffer->imageCount		= 0;
+}
+
+void	kdo_freeBSTNode(Kdo_VkBSTNode **node)
 {
 	if ((*node)->left)
 		kdo_freeBSTNode(&((*node)->left));
@@ -218,33 +245,38 @@ void		kdo_freeBSTNode(Kdo_VkBSTNode **node)
 	KDO_FREE(*node);
 }
 
-void		kdo_freeBST(Kdo_VkBST *bst)
+void	kdo_freeBST(Kdo_VkBST *bst)
 {
 	kdo_freeBSTNode(&bst->root);
 }
 
-void		kdo_freeBuffer(VkDevice device, Kdo_VkBuffer *buffer)
+void	kdo_freeImageBST(Kdo_VkImageBST *imageBst)
+{
+	kdo_freeBSTNode(&imageBst->root);
+}
+
+void	kdo_freeBuffer(VkDevice device, Kdo_VkBuffer *buffer)
 {
 	kdo_freeGPUBuffer(device, &buffer->GPU);
 	kdo_freeCPUBuffer(&buffer->CPU);
 }
 
-void		kdo_freeSetBuffer(VkDevice device, Kdo_VkSetBuffer *buffer)
+void	kdo_freeSetBuffer(VkDevice device, Kdo_VkSetBuffer *buffer)
 {
 	kdo_freeGPUBuffer(device, &buffer->GPU);
 	kdo_freeCPUBuffer(&buffer->CPU);
 	kdo_freeBST(&buffer->BST);
 }
 
-void		kdo_freeSetImageBuffer(VkDevice device, Kdo_VkSetImageBuffer *imageBuffer)
+void	kdo_freeSetImageBuffer(VkDevice device, Kdo_VkSetImageBuffer *imageBuffer)
 {
 	kdo_freeGPUImageBuffer(device, &imageBuffer->GPU);
-	kdo_freeCPUBuffer(&imageBuffer->CPU);
-	kdo_freeBST(&imageBuffer->BST);
+	kdo_freeCPUImageBuffer(&imageBuffer->CPU);
+	kdo_freeImageBST(&imageBuffer->BST);
 }
 
 
-VkResult		kdo_beginUniqueCommand(VkDevice device, VkCommandPool commandPool, VkCommandBuffer *commandBuffer)
+VkResult	kdo_beginUniqueCommand(VkDevice device, VkCommandPool commandPool, VkCommandBuffer *commandBuffer)
 {
 	VkCommandBufferAllocateInfo	allocInfo;
 	VkCommandBufferBeginInfo	beginInfo;
@@ -266,7 +298,7 @@ VkResult		kdo_beginUniqueCommand(VkDevice device, VkCommandPool commandPool, VkC
 	return (VK_SUCCESS);
 }
 
-VkResult        kdo_findMemoryType(uint32_t typeFilter, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, uint32_t *memoryType)
+VkResult	kdo_findMemoryType(uint32_t typeFilter, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, uint32_t *memoryType)
 {
 	*memoryType = 0;
 	while ( *memoryType < memoryProperties.memoryTypeCount)
@@ -307,7 +339,7 @@ VkDeviceSize	kdo_maxSize(VkDeviceSize val1, VkDeviceSize val2)
 	return (val1);
 }
 
-VkResult		kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
+VkResult	kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
 								    VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, \
 									VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, \
 									VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -333,7 +365,7 @@ VkResult		kdo_cmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, \
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_endUniqueCommand(VkCommandBuffer *commandBuffer, VkDevice device, VkCommandPool commandPool, VkQueue queue)
+VkResult	kdo_endUniqueCommand(VkCommandBuffer *commandBuffer, VkDevice device, VkCommandPool commandPool, VkQueue queue)
 {
 	VkSubmitInfo	submitInfo;
 	VkResult		returnCode;
@@ -358,14 +390,13 @@ VkResult		kdo_endUniqueCommand(VkCommandBuffer *commandBuffer, VkDevice device, 
 }
 
 
-VkResult        kdo_reallocGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, VkDeviceSize newSize)
+VkResult	kdo_reallocGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, VkDeviceSize newSize)
 {
 	Kdo_VkGPUBuffer newBuffer;
 	VkResult		returnCode;
 
 
-	newSize	= kdo_maxSize(buffer->memory.size * 2, newSize);
-
+	buffer->info.size	= kdo_maxSize(buffer->memory.size * 2, newSize);
 	KDO_VK_ASSERT(kdo_newGPUBuffer(device, memoryProperties, buffer->memory.flags, buffer->memory.waitFlags, &buffer->info, &newBuffer));
 	KDO_VK_ASSERT(kdo_cpyGPUBuffer(device, commandPool, queue, &newBuffer, 0, buffer, 0, kdo_minSize(buffer->fillSize, newSize)));
 
@@ -375,7 +406,7 @@ VkResult        kdo_reallocGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProp
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_writeHostGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
+VkResult	kdo_writeHostGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
 {
 	void            *mapMemory;
 	VkResult		returnCode;
@@ -393,7 +424,7 @@ VkResult		kdo_writeHostGPUMemory(VkDevice device, Kdo_VkGPUMemory *memory, VkDev
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_writeGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
+VkResult	kdo_writeGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
 {
 	Kdo_VkGPUBuffer	stagingBuffer;
 	VkResult		returnCode;
@@ -419,7 +450,7 @@ VkResult		kdo_writeGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties m
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_cpyGPUBuffer(VkDevice device, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *dstBuffer, VkDeviceSize dstOffset, Kdo_VkGPUBuffer *srcBuffer, VkDeviceSize srcOffset, VkDeviceSize dataSize)
+VkResult	kdo_cpyGPUBuffer(VkDevice device, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *dstBuffer, VkDeviceSize dstOffset, Kdo_VkGPUBuffer *srcBuffer, VkDeviceSize srcOffset, VkDeviceSize dataSize)
 {
 	VkCommandBuffer			commandBuffer;
 	VkBufferCopy			copyInfo;
@@ -446,7 +477,7 @@ VkResult		kdo_cpyGPUBuffer(VkDevice device, VkCommandPool commandPool, VkQueue q
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_pushGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, void *data, VkDeviceSize dataSize)
+VkResult	kdo_pushGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUBuffer *buffer, void *data, VkDeviceSize dataSize)
 {
 	VkResult        returnCode;
 
@@ -459,7 +490,7 @@ VkResult		kdo_pushGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties me
 }
 
 
-VkResult		kdo_reallocGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, VkDeviceSize newSize)
+VkResult	kdo_reallocGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, VkDeviceSize newSize)
 {
 	Kdo_VkGPUImageBuffer	newImageBuffer;
 	VkResult				returnCode;
@@ -521,7 +552,7 @@ VkResult	kdo_bindGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties memo
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_pushGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, Kdo_VkGPUImage *image)
+VkResult	kdo_pushGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, Kdo_VkGPUImage *image)
 {
 	VkCommandBuffer		commandBuffer;
 	VkImageCopy			copyInfo;   
@@ -561,7 +592,7 @@ VkResult		kdo_pushGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties mem
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_pushGPUImageFromGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, VkExtent3D extent, VkImageLayout layout, Kdo_VkGPUBuffer *buffer, VkDeviceSize offset)
+VkResult	kdo_pushGPUImageFromGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, VkExtent3D extent, VkImageLayout layout, Kdo_VkGPUBuffer *buffer, VkDeviceSize offset)
 {
 	VkCommandBuffer         commandBuffer;
 	VkBufferImageCopy       copyBufferInfo;
@@ -596,7 +627,7 @@ VkResult		kdo_pushGPUImageFromGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryP
 }
 
 
-VkResult		kdo_reallocCPUBuffer(Kdo_VkCPUBuffer *buffer, VkDeviceSize newSize)
+VkResult	kdo_reallocCPUBuffer(Kdo_VkCPUBuffer *buffer, VkDeviceSize newSize)
 {
 	newSize	= kdo_maxSize(buffer->size * 2, newSize);
 	if (!(buffer->path	= realloc(buffer->path, newSize)))
@@ -607,7 +638,7 @@ VkResult		kdo_reallocCPUBuffer(Kdo_VkCPUBuffer *buffer, VkDeviceSize newSize)
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_writeCPUBufferData(Kdo_VkCPUBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
+VkResult	kdo_writeCPUBufferData(Kdo_VkCPUBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
 {
 	if (buffer->size < offset + dataSize)
 		return (VK_ERROR_MEMORY_MAP_FAILED);
@@ -634,6 +665,18 @@ VkResult	kdo_pushCPUBufferData(Kdo_VkCPUBuffer *buffer, void *data, VkDeviceSize
 	return (VK_SUCCESS);
 }
 
+VkResult	kdo_pushCPUImageBufferPath(Kdo_VkCPUImageBuffer *imageBuffer, char *imagePath)
+{
+	if (imageBuffer->maxImageCount <= imageBuffer->imageCount)
+		return (VK_ERROR_NOT_PERMITTED_EXT);
+
+	imageBuffer->path[imageBuffer->imageCount]	= imagePath;
+	imageBuffer->imageCount++;
+
+	return (VK_SUCCESS);
+}
+
+
 Kdo_VkBSTNode   **kdo_BSTNodeFind(Kdo_VkBSTNode **root, void *buffer, void *data, VkDeviceSize dataSize)
 {
 	int	cmp;
@@ -649,22 +692,22 @@ Kdo_VkBSTNode   **kdo_BSTNodeFind(Kdo_VkBSTNode **root, void *buffer, void *data
 	return (root);
 }
 
-Kdo_VkBSTNode   **kdo_BSTNodeStrFind(Kdo_VkBSTNode **root, char *str, char **strBuffer)
+Kdo_VkBSTNode   **kdo_BSTNodeImageFind(Kdo_VkBSTNode **root, char *imagePath, char **pathBuffer)
 {
 	int	cmp;
 
 	if (*root)
 	{
-		cmp = strcmp(basename(strBuffer[(*root)->index]), basename(str));
+		cmp = strcmp(basename(pathBuffer[(*root)->index]), basename(imagePath));
 		if (0 < cmp)
-			return (kdo_BSTNodeStrFind(&(*root)->left, str, strBuffer));
+			return (kdo_BSTNodeImageFind(&(*root)->left, imagePath, pathBuffer));
 		else if (cmp < 0)
-			return (kdo_BSTNodeStrFind(&(*root)->right, str, strBuffer));
+			return (kdo_BSTNodeImageFind(&(*root)->right, imagePath, pathBuffer));
 	}
 	return (root);
 }
 
-VkResult		kdo_BSTPush(Kdo_VkBST *bst, void *data, uint32_t *index)
+VkResult	kdo_BSTPush(Kdo_VkBST *bst, void *data, uint32_t *index)
 {
 	Kdo_VkBSTNode	**node;
 	VkResult		returnCode;
@@ -680,16 +723,16 @@ VkResult		kdo_BSTPush(Kdo_VkBST *bst, void *data, uint32_t *index)
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_BSTStrPush(Kdo_VkBST *bst, char *str, uint32_t *index)
+VkResult	kdo_BSTImagePush(Kdo_VkImageBST *imageBst, char *imagePath, uint32_t *index)
 {
 	Kdo_VkBSTNode	**node;
 	VkResult		returnCode;
 
-	node = kdo_BSTNodeStrFind(&bst->root, str, (char **)bst->CPUBuffer->path);
+	node = kdo_BSTNodeImageFind(&imageBst->root, imagePath, imageBst->CPUImageBuffer->path);
 	if (*node == NULL)
 	{
-		KDO_VK_ASSERT(kdo_newBSTNode(bst->CPUBuffer->fillSize / bst->elementSize, node));
-		KDO_VK_ASSERT(kdo_pushCPUBufferData(bst->CPUBuffer, &str, bst->elementSize));
+		KDO_VK_ASSERT(kdo_newBSTNode(imageBst->CPUImageBuffer->imageCount, node));
+		KDO_VK_ASSERT(kdo_pushCPUImageBufferPath(imageBst->CPUImageBuffer, imagePath));
 	}
 	*index	= (*node)->index;
 
@@ -697,32 +740,34 @@ VkResult		kdo_BSTStrPush(Kdo_VkBST *bst, char *str, uint32_t *index)
 }
 
 
-VkResult		kdo_writeBufferData(Kdo_VkBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
+VkResult	kdo_writeBufferData(Kdo_VkBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize)
 {
 	return (kdo_writeCPUBufferData(&buffer->CPU, offset, data, dataSize));
 }
 
-VkResult		kdo_pushBufferData(Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize)
+VkResult	kdo_pushBufferData(Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize)
 {
 	return (kdo_pushCPUBufferData(&buffer->CPU, data, dataSize));
 }
 
-VkResult		kdo_pushSetBufferData(Kdo_VkSetBuffer *buffer, void *data, uint32_t *index)
+VkResult	kdo_pushSetBufferData(Kdo_VkSetBuffer *buffer, void *data, uint32_t *index)
 {
 	return (kdo_BSTPush(&buffer->BST, data, index));
 }
 
-VkResult		kdo_pushSetImageBufferPath(Kdo_VkSetImageBuffer *imageBuffer, char *path, uint32_t *index)
+VkResult	kdo_pushSetImageBufferPath(Kdo_VkSetImageBuffer *imageBuffer, char *imagePath, uint32_t *index)
 {
+	int	indexNull;
+
 	*index	= 0;
-	if (stbi_info(path, NULL, NULL, NULL))
-		return (kdo_BSTStrPush(&imageBuffer->BST, path, index));
+	if (stbi_info(imagePath, &indexNull, &indexNull, &indexNull))
+		return (kdo_BSTImagePush(&imageBuffer->BST, imagePath, index));
 	
 	return (VK_SUCCESS);
 }
 
 
-VkResult		kdo_updateBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer, VkDeviceSize offset, VkDeviceSize size)
+VkResult	kdo_updateBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer, VkDeviceSize offset, VkDeviceSize size)
 {
 	VkResult	returnCode;
 
@@ -739,7 +784,7 @@ VkResult		kdo_updateBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties mem
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_updateAllBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer)
+VkResult	kdo_updateAllBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer)
 {
 	VkResult	returnCode;
 
@@ -751,7 +796,7 @@ VkResult		kdo_updateAllBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties 
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_updateSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkSetBuffer *buffer)
+VkResult	kdo_updateSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkSetBuffer *buffer)
 {
 	VkResult	returnCode;
 
@@ -763,29 +808,28 @@ VkResult		kdo_updateSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties 
 	return (VK_SUCCESS);
 }
 
-VkResult		kdo_updateSetImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkSetImageBuffer *imageBuffer, VkImageLayout layout)
+VkResult	kdo_updateSetImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkSetImageBuffer *imageBuffer, VkImageLayout layout)
 {
 	Kdo_VkGPUBuffer	stagingBuffer;
-	VkDeviceSize	offset;
+	VkResult		returnCode;
 	VkExtent3D		extent;
 	int				texChannels;
 	void			*data;
 
-	extent.depth	= 1;
-	offset = imageBuffer->GPU.imageCount * imageBuffer->BST.elementSize;
+	if (imageBuffer->CPU.imageCount < imageBuffer->GPU.imageCount)
+		return (VK_ERROR_MEMORY_MAP_FAILED);
 
-	while (offset < imageBuffer->CPU.fillSize)
+	extent.depth	= 1;
+	for (uint32_t i = imageBuffer->GPU.imageCount; i < imageBuffer->CPU.imageCount; i++)
 	{
-		if (!(data	= stbi_load(imageBuffer->CPU.path + offset, (int *)&extent.width, (int *)&extent.height, &texChannels, STBI_rgb_alpha)))
+		if (!(data	= stbi_load(imageBuffer->CPU.path[i], (int *)&extent.width, (int *)&extent.height, &texChannels, STBI_rgb_alpha)))
 			return (VK_ERROR_UNKNOWN);
 
-		kdo_newGPUStagingBuffer(device, memoryProperties, &stagingBuffer, data, extent.width * extent.height * 4);
-		kdo_pushGPUImageFromGPUBuffer(device, memoryProperties, commandPool, queue, &imageBuffer->GPU, extent, layout, &stagingBuffer, 0);
+		KDO_VK_ASSERT(kdo_newGPUStagingBuffer(device, memoryProperties, &stagingBuffer, data, extent.width * extent.height * 4));
+		KDO_VK_ASSERT(kdo_pushGPUImageFromGPUBuffer(device, memoryProperties, commandPool, queue, &imageBuffer->GPU, extent, layout, &stagingBuffer, 0));
 
 		kdo_freeGPUBuffer(device, &stagingBuffer);
 		stbi_image_free(data);
-
-		offset	+= imageBuffer->BST.elementSize;
 	}
 
 	return (VK_SUCCESS);

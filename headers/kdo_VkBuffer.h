@@ -64,6 +64,14 @@ typedef struct Kdo_VkCPUBuffer
 	VkDeviceSize	fillSize;
 }	Kdo_VkCPUBuffer;
 
+typedef struct Kdo_VkCPUImageBuffer
+{
+    char		**path;
+	uint32_t	maxImageCount;
+	uint32_t	imageCount;
+}	Kdo_VkCPUImageBuffer;
+
+
 typedef struct Kdo_VkBSTNode
 {
     struct Kdo_VkBSTNode	*left;
@@ -77,6 +85,13 @@ typedef struct Kdo_VkBST
 	Kdo_VkCPUBuffer	*CPUBuffer;
 	VkDeviceSize	elementSize;
 }	Kdo_VkBST;
+
+typedef struct Kdo_VkImageBST
+{
+	Kdo_VkBSTNode			*root;
+	Kdo_VkCPUImageBuffer	*CPUImageBuffer;
+}	Kdo_VkImageBST;
+
 
 typedef	struct Kdo_VkBuffer
 {
@@ -94,13 +109,22 @@ typedef struct Kdo_VkSetBuffer
 typedef struct	Kdo_VkSetImageBuffer
 {
     Kdo_VkGPUImageBuffer	GPU;
-    Kdo_VkCPUBuffer			CPU;
-    Kdo_VkBST				BST;
+    Kdo_VkCPUImageBuffer	CPU;
+    Kdo_VkImageBST			BST;
 }	Kdo_VkSetImageBuffer;
 
 # define KDO_VK_ASSERT(function) if ((returnCode = function) != VK_SUCCESS) return (returnCode)
 # define KDO_DESTROY(function, device, handle) if (handle) {function(device, handle, NULL); handle = VK_NULL_HANDLE;}
 # define KDO_FREE(pointer) if (pointer != NULL) {free(pointer); pointer = NULL;}
+
+# define kdo_getGPUBuffer(buffer)				buffer.GPU.path
+# define kdo_getGPUBufferSize(buffer)			buffer.GPU.fillSize
+# define kdo_getCPUBuffer(buffer)				buffer.CPU.path
+# define kdo_getCPUBufferSize(buffer)			buffer.CPU.fillSize
+# define kdo_getCPUImageBufferCount(buffer)		buffer.CPU.imageCount
+# define kdo_getGPUImage(imageBuffer, index)	imageBuffer.GPU.imageArray[index]
+# define kdo_getGPULastImage(imageBuffer)		imageBuffer.GPU.imageArray[imageBuffer.GPU.imageCount - 1]
+# define kdo_getGPUImageCount(imageBuffer)		imageBuffer.GPU.imageCount
 
 VkResult		kdo_newGPUMemory(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, uint32_t memoryFilter, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize size, Kdo_VkGPUMemory *memory);
 VkResult		kdo_newGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkBufferCreateInfo *bufferInfo, Kdo_VkGPUBuffer *buffer);
@@ -108,8 +132,10 @@ VkResult		kdo_newGPUStagingBuffer(VkDevice device, VkPhysicalDeviceMemoryPropert
 VkResult		kdo_newGPUImage(VkDevice device, VkImageLayout layout, VkImageCreateInfo *imageInfo, Kdo_VkGPUImage *image);
 VkResult		kdo_newGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize size, uint32_t maxImageCount, VkImageCreateInfo  *imageInfo, Kdo_VkGPUImageBuffer *imageBuffer);
 VkResult		kdo_newCPUBuffer(VkDeviceSize size, Kdo_VkCPUBuffer *buffer);
+VkResult        kdo_newCPUImageBuffer(uint32_t  maxImageCount, Kdo_VkCPUImageBuffer *imageBuffer);
 VkResult		kdo_newBSTNode(uint32_t index, Kdo_VkBSTNode **node);
 VkResult		kdo_newBST(VkDeviceSize elementSize, Kdo_VkCPUBuffer *CPUBuffer, Kdo_VkBST *bst);
+VkResult        kdo_newImageBST(Kdo_VkCPUImageBuffer *CPUImageBuffer, Kdo_VkImageBST *bst);	
 VkResult		kdo_newBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkBufferCreateInfo *bufferInfo, Kdo_VkBuffer *buffer);
 VkResult		kdo_newSetBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize elementSize, VkBufferCreateInfo *bufferInfo, Kdo_VkSetBuffer *buffer);
 VkResult		kdo_newSetImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkMemoryPropertyFlags memoryFlags, Kdo_VkWait waitFlags, VkDeviceSize size, uint32_t maxImageCount, VkImageCreateInfo  *imageInfo, Kdo_VkSetImageBuffer *imageBuffer);
@@ -120,8 +146,10 @@ void			kdo_freeGPUBuffer(VkDevice device, Kdo_VkGPUBuffer *buffer);
 void			kdo_freeGPUImage(VkDevice device, Kdo_VkGPUImage *image);
 void			kdo_freeGPUImageBuffer(VkDevice device, Kdo_VkGPUImageBuffer *imageBuffer);
 void			kdo_freeCPUBuffer(Kdo_VkCPUBuffer *buffer);
+void			kdo_freeCPUImageBuffer(Kdo_VkCPUImageBuffer *imageBuffer);
 void			kdo_freeBSTNode(Kdo_VkBSTNode **node);
 void			kdo_freeBST(Kdo_VkBST *bst);
+void			kdo_freeImageBST(Kdo_VkImageBST *imageBst);
 void			kdo_freeBuffer(VkDevice device, Kdo_VkBuffer *buffer);
 void			kdo_freeSetBuffer(VkDevice device, Kdo_VkSetBuffer *buffer);
 void			kdo_freeSetImageBuffer(VkDevice device, Kdo_VkSetImageBuffer *imageBuffer);
@@ -152,15 +180,17 @@ VkResult		kdo_pushGPUImageFromGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryP
 VkResult		kdo_reallocCPUBuffer(Kdo_VkCPUBuffer *buffer, VkDeviceSize newSize);
 VkResult		kdo_writeCPUBufferData(Kdo_VkCPUBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize);
 VkResult		kdo_pushCPUBufferData(Kdo_VkCPUBuffer *buffer, void *data, VkDeviceSize dataSize);
+VkResult	    kdo_pushCPUImageBufferPath(Kdo_VkCPUImageBuffer *imageBuffer, char *imagePath);
 Kdo_VkBSTNode   **kdo_BSTNodeFind(Kdo_VkBSTNode **root, void *buffer, void *data, VkDeviceSize dataSize);
-Kdo_VkBSTNode   **kdo_BSTNodeStrFind(Kdo_VkBSTNode **root, char *str, char **strBuffer);
+Kdo_VkBSTNode   **kdo_BSTNodeImageFind(Kdo_VkBSTNode **root, char *imagePath, char **pathBuffer);
 VkResult		kdo_BSTPush(Kdo_VkBST *bst, void *data, uint32_t *index);
-VkResult		kdo_BSTStrPush(Kdo_VkBST *bst, char *str, uint32_t *index);
+VkResult        kdo_BSTImagePush(Kdo_VkImageBST *imageBst, char *imagePath, uint32_t *index);
+VkResult		kdo_BSTImagePush(Kdo_VkImageBST *bst, char *imagePath, uint32_t *index);
 
 VkResult		kdo_writeBufferData(Kdo_VkBuffer *buffer, VkDeviceSize offset, void *data, VkDeviceSize dataSize);
 VkResult		kdo_pushBufferData(Kdo_VkBuffer *buffer, void *data, VkDeviceSize dataSize);
 VkResult		kdo_pushSetBufferData(Kdo_VkSetBuffer *buffer, void *data, uint32_t *index);
-VkResult		kdo_pushSetImageBufferPath(Kdo_VkSetImageBuffer *imageBuffer, char *path, uint32_t *index);
+VkResult        kdo_pushSetImageBufferPath(Kdo_VkSetImageBuffer *imageBuffer, char *imagePath, uint32_t *index);
 
 VkResult		kdo_updateBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer, VkDeviceSize offset, VkDeviceSize size);
 VkResult		kdo_updateAllBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkBuffer *buffer);

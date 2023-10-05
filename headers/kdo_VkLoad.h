@@ -13,12 +13,11 @@
 # define KDO_VKLOAD_H
 
 # include "kdo_Vulkan.h"
-# include "kdo_VkOpenOBJ.h"
-# include <libgen.h>
+# include "kdo_VkMemory.h"
 
 typedef struct Kdo_VkObjectInfoElement
 {
-	uint32_t		freeCount;
+	uint32_t		maxCount;
 	uint32_t		*matchArray;
 }	Kdo_VkObjectInfoElement;
 
@@ -31,15 +30,31 @@ typedef struct Kdo_VkObjectInfo
 	Kdo_VkObjectInfoElement	uv;
 	Kdo_VkObjectInfoElement	material;
 	Kdo_VkObjectInfoElement	texture;
+	uint32_t				vertexMaxCount;
 	uint32_t				vertexCount;
 	Kdo_VkVertex			*vertex;
 	Kdo_VkObject			object;
 }   Kdo_VkObjectInfo;
 
-void				kdo_findNormal(vec3 pos1, vec3 pos2, vec3 pos3, vec3 normal);
-void				kdo_findRawTangent(vec3 pos1, vec3 pos2, vec3 pos3, vec2 uv1, vec2 uv2, vec2 uv3, vec3 rawTangent);
-void				kdo_findTangent(vec3 rawTangent, vec2 normal, vec3 tangent);
-Kdo_VkMaterial		kdo_defaultMaterial(void);
-void				kdo_loadObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo info);
+VkResult	kdo_initObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo,
+							uint32_t maxVertexCount,
+							uint32_t maxPosCount,
+							uint32_t maxTangentCount,
+							uint32_t maxBitangentCount,
+							uint32_t maxNormalCount,
+							uint32_t maxUvCount,
+							uint32_t maxMaterialCount,
+							uint32_t maxTextureCount);
+VkResult	kdo_addPosObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos);
+VkResult	kdo_addTangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent);
+VkResult	kdo_addBitangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent);
+VkResult	kdo_addNormalObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal);
+VkResult	kdo_addUvObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec2 uv);
+VkResult	kdo_addTextureObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, char *path);
+VkResult	kdo_addMaterialObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial material);
+VkResult	kdo_addTriangleObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3]);
+
+VkResult    kdo_openObject(Kdo_Vulkan *vk, char *objectPath, Kdo_VkObjectInfo *objectInfo);
+VkResult	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *info);
 
 #endif

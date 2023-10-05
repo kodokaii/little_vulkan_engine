@@ -15,7 +15,10 @@ static void	kdo_readSpirV(Kdo_Vulkan *vk, const char *fileName, Kdo_Shader *shad
 {
 	FILE	*file;
 
-	if (!(file = fopen(fileName, "rb"))) { printf("Can't open %s file\n", fileName); kdo_cleanup(vk, "File error", 9);
+	if (!(file = fopen(fileName, "rb")))
+	{
+		printf("Can't open %s file\n", fileName);
+		kdo_cleanup(vk, "File error", 9);
 	}
 	fseek(file, 0, SEEK_END);
 	shader->codeSize = ftell(file);
@@ -44,50 +47,57 @@ static void kdo_createShaderModule(Kdo_Vulkan *vk, Kdo_Shader *shader)
 
 static void	kdo_initPipelineLayout(Kdo_Vulkan *vk)
 {
-	VkDescriptorSetLayoutBinding				descriptorSetBinding[6];
+	VkDescriptorSetLayoutBinding				descriptorSetBinding[7];
 	VkDescriptorSetLayoutCreateInfo				descriptorSetInfo;
 	VkPushConstantRange							constantsRange;
 	VkPipelineLayoutCreateInfo					pipelineLayoutInfo;
 
 	descriptorSetBinding[0].binding				= 0;
-	descriptorSetBinding[0].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[0].descriptorType		= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	descriptorSetBinding[0].descriptorCount		= 1;
 	descriptorSetBinding[0].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[0].pImmutableSamplers	= NULL;
 
 	descriptorSetBinding[1].binding				= 1;
-	descriptorSetBinding[1].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[1].descriptorType		= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	descriptorSetBinding[1].descriptorCount		= 1;
 	descriptorSetBinding[1].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[1].pImmutableSamplers	= NULL;
 
 	descriptorSetBinding[2].binding				= 2;
-	descriptorSetBinding[2].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorSetBinding[2].descriptorType		= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	descriptorSetBinding[2].descriptorCount		= 1;
-	descriptorSetBinding[2].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[2].stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
 	descriptorSetBinding[2].pImmutableSamplers	= NULL;
 
 	descriptorSetBinding[3].binding				= 3;
-	descriptorSetBinding[3].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descriptorSetBinding[3].descriptorCount		= MAX_TEXTURE;
+	descriptorSetBinding[3].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLER;
+	descriptorSetBinding[3].descriptorCount		= 1;
 	descriptorSetBinding[3].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[3].pImmutableSamplers	= NULL;
 
 	descriptorSetBinding[4].binding				= 4;
-	descriptorSetBinding[4].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorSetBinding[4].descriptorCount		= 1;
+	descriptorSetBinding[4].descriptorType		= VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descriptorSetBinding[4].descriptorCount		= MAX_TEXTURE;
 	descriptorSetBinding[4].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	descriptorSetBinding[5].binding				= 5;
-	descriptorSetBinding[5].descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetBinding[5].descriptorType		= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	descriptorSetBinding[5].descriptorCount		= 1;
 	descriptorSetBinding[5].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
 	descriptorSetBinding[5].pImmutableSamplers	= NULL;
 
+	descriptorSetBinding[6].binding				= 6;
+	descriptorSetBinding[6].descriptorType		= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	descriptorSetBinding[6].descriptorCount		= 1;
+	descriptorSetBinding[6].stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+	descriptorSetBinding[6].pImmutableSamplers	= NULL;
+
+
 	descriptorSetInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptorSetInfo.pNext			= NULL;
 	descriptorSetInfo.flags			= 0;
-	descriptorSetInfo.bindingCount	= 6;
+	descriptorSetInfo.bindingCount	= 7;
 	descriptorSetInfo.pBindings		= descriptorSetBinding;
 	if (vkCreateDescriptorSetLayout(vk->device.path, &descriptorSetInfo, NULL, &vk->graphicsPipeline.descriptorLayout) != VK_SUCCESS)
 		kdo_cleanup(vk, "Descriptor layout creation failed", 14);
@@ -173,15 +183,15 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
 	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, normalIndex);
 
-	attributeDescriptions[3].location	= 4;
-	attributeDescriptions[3].binding	= 0;
-	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
-	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, uvIndex);
+	attributeDescriptions[4].location	= 4;
+	attributeDescriptions[4].binding	= 0;
+	attributeDescriptions[4].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[4].offset		= offsetof(Kdo_VkVertex, uvIndex);
 
-	attributeDescriptions[3].location	= 5;
-	attributeDescriptions[3].binding	= 0;
-	attributeDescriptions[3].format		= VK_FORMAT_R32_UINT;
-	attributeDescriptions[3].offset		= offsetof(Kdo_VkVertex, mtlIndex);
+	attributeDescriptions[5].location	= 5;
+	attributeDescriptions[5].binding	= 0;
+	attributeDescriptions[5].format		= VK_FORMAT_R32_UINT;
+	attributeDescriptions[5].offset		= offsetof(Kdo_VkVertex, mtlIndex);
 
 	vertexInputInfo.sType								= VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.pNext								= NULL;
@@ -269,7 +279,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	colorBlendAttachment.srcAlphaBlendFactor	= VK_BLEND_FACTOR_ONE;
 	colorBlendAttachment.dstAlphaBlendFactor	= VK_BLEND_FACTOR_ZERO;
 	colorBlendAttachment.alphaBlendOp			= VK_BLEND_OP_ADD;
-	colorBlendAttachment.colorWriteMask		= VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.colorWriteMask			= VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	colorBlendingInfo.sType					= VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlendingInfo.pNext					= NULL;

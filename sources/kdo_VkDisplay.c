@@ -62,13 +62,13 @@ static void	kdo_updateRenderCommand(Kdo_Vulkan *vk)
 
 	vkCmdBindDescriptorSets(vk->display.renderPool[vk->display.currentImage].main, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphicsPipeline.layout, 0, 1, &vk->core.descriptorSet, 0, NULL);
 
-	vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &vk->core.buffer.vertex.path.buffer, vertexOffsets);
+	vkCmdBindVertexBuffers(vk->display.renderPool[vk->display.currentImage].main, 0, 1, &kdo_getGPUBuffer(vk->core.buffer.vertex), vertexOffsets);
 
 	glm_mat4_dup(vk->camera.path, push.camera);
 	glm_vec4_dup(vk->camera.pos, push.cameraPos);
 	vkCmdPushConstants(vk->display.renderPool[vk->display.currentImage].main, vk->graphicsPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Kdo_VkPush), &push);
 
-	vkCmdDrawIndirect(vk->display.renderPool[vk->display.currentImage].main, vk->core.buffer.object.path.buffer, offsetof(Kdo_ShObject, drawCommand), vk->core.buffer.object.count, sizeof(Kdo_ShObject));
+	vkCmdDrawIndirect(vk->display.renderPool[vk->display.currentImage].main, kdo_getGPUBuffer(vk->core.buffer.object), offsetof(Kdo_VkObject, drawCommand), vk->core.objectCount, sizeof(Kdo_VkObject));
 	vkCmdEndRenderPass(vk->display.renderPool[vk->display.currentImage].main);
 
 	if (vkEndCommandBuffer(vk->display.renderPool[vk->display.currentImage].main) != VK_SUCCESS)

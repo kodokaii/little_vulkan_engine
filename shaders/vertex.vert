@@ -1,4 +1,4 @@
-#version 460
+#version 450
 #extension GL_ARB_separate_shader_objects : enable
 
 struct Object
@@ -49,8 +49,8 @@ layout(location = 5) out uint	outMtlIndex;
 
 void main()
 { 
-	mat4	inModelMat	= objectBuffer.objectArray[gl_BaseInstance].modelMat;
-	mat4	inNormalMat	= objectBuffer.objectArray[gl_BaseInstance].normalMat;
+	mat4	inModelMat	= objectBuffer.objectArray[gl_InstanceIndex].modelMat;
+	mat4	inNormalMat	= objectBuffer.objectArray[gl_InstanceIndex].normalMat;
 	vec3	inPos		= vector3Buffer.vec3Array[inPosIndex];
 	vec3	inTangent	= vector3Buffer.vec3Array[inTangentIndex];
 	vec3	inBitangent	= vector3Buffer.vec3Array[inBitangentIndex];

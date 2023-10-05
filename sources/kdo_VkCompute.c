@@ -88,19 +88,10 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (vk->compute.startTime == 0)
 	{
-		Kdo_ShLight			light			= {{5.0f, 0.0f, -10.0f, 10.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
-		Kdo_VkObjectInfo	objectInfo[1]	= {kdo_openObj(vk, "obj/aircraft/aircraft.obj")};
-		mat4				mat[2]			= {GLM_MAT4_IDENTITY_INIT, GLM_MAT4_IDENTITY_INIT};
-		vec3				vec;
+		Kdo_VkObjectInfo	objectInfo;
 
-		kdo_setData(vk, &vk->core.buffer.light, &light, sizeof(Kdo_ShLight), vk->core.buffer.light.sizeUsed);
-
-		kdo_loadObject(vk, objectInfo[0]);
-		printf("triangleCount = %d", vk->core.count.index / 3);
-
-		glm_vec3_broadcast(1, vec);
-		kdo_createMat(mat[0], mat[1], GLM_VEC3_ZERO, GLM_VEC3_ZERO, vec);
-		kdo_setData(vk, &vk->core.buffer.object, mat, 2 * sizeof(mat4), 0);
+		kdo_openObject(vk, "obj/cube.obj", &objectInfo);
+		kdo_loadObject(vk, 1, &objectInfo);
 
 		vk->compute.startTime = vk->compute.currentTime;
 	}

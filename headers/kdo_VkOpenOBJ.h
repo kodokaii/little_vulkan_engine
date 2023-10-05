@@ -14,6 +14,6 @@
 
 #include "kdo_VkLoad.h"
 
-Kdo_VkObjectInfo	kdo_openObj(Kdo_Vulkan *vk, char *objPath);
+VkResult    kdo_openObj(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, char *objPath);
 
 #endif

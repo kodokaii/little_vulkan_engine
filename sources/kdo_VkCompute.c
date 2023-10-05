@@ -88,10 +88,12 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (vk->compute.startTime == 0)
 	{
-		Kdo_VkObjectInfo	objectInfo;
+		Kdo_VkObjectInfo	objectInfo[1];
 
-		kdo_openObject(vk, "obj/cube.obj", &objectInfo);
-		kdo_loadObject(vk, 1, &objectInfo);
+		kdo_vkUpdateAllBuffer(vk, &vk->core.buffer.light);
+
+		kdo_openObject(vk, "obj/viking_room.obj", objectInfo);
+		kdo_loadObject(vk, 1, objectInfo);
 
 		vk->compute.startTime = vk->compute.currentTime;
 	}

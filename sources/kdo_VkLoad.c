@@ -66,9 +66,9 @@ static void kdo_updateDescriptor(Kdo_Vulkan *vk)
 	writeBufferInfo[3].offset	= 0;
 	writeBufferInfo[3].range	= kdo_getGPUBufferSize(vk->core.buffer.material);
 
-	writeBufferInfo[2].buffer	= kdo_getGPUBuffer(vk->core.buffer.light);
-	writeBufferInfo[2].offset	= 0;
-	writeBufferInfo[2].range	= kdo_getGPUBufferSize(vk->core.buffer.light);
+	writeBufferInfo[4].buffer	= kdo_getGPUBuffer(vk->core.buffer.light);
+	writeBufferInfo[4].offset	= 0;
+	writeBufferInfo[4].range	= kdo_getGPUBufferSize(vk->core.buffer.light);
 
 
 	descriptorWrite[0].sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

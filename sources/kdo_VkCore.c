@@ -83,38 +83,14 @@ static void kdo_initBuffer(Kdo_Vulkan *vk)
 	kdo_vkNewSetBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkMaterial), sizeof(Kdo_VkMaterial), &vk->core.buffer.material);
 	kdo_vkNewSetImageBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, MAX_TEXTURE, 128, &vk->core.buffer.texture);
 	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkLight), &vk->core.buffer.light);
-	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkVertex), &vk->core.buffer.vertex);
-	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkObject), &vk->core.buffer.object);
+	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, sizeof(Kdo_VkVertex), &vk->core.buffer.vertex);
+	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkObject), &vk->core.buffer.object);
 
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, defaultVec3, &indexNull);
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector2, defaultVec2, &indexNull);
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.material, &defaultMtl, &indexNull);
 	kdo_vkPushSetImageBufferPath(vk, &vk->core.buffer.texture, defaultTexture, &indexNull);
 	kdo_vkPushBufferData(vk, &vk->core.buffer.light, &defaultLight, sizeof(Kdo_VkLight));
-
-
-
-	VkDescriptorBufferInfo			writeBufferInfo;
-	VkWriteDescriptorSet			descriptorWrite;
-
-	kdo_vkUpdateAllBuffer(vk, &vk->core.buffer.light);
-
-	writeBufferInfo.buffer	= kdo_getGPUBuffer(vk->core.buffer.light);
-	writeBufferInfo.offset	= 0;
-	writeBufferInfo.range	= kdo_getGPUBufferSize(vk->core.buffer.light);
-
-	descriptorWrite.sType               = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.pNext               = NULL;
-	descriptorWrite.dstSet              = vk->core.descriptorSet;
-	descriptorWrite.dstBinding          = 0;
-	descriptorWrite.dstArrayElement     = 0;
-	descriptorWrite.descriptorCount     = 1;
-	descriptorWrite.descriptorType      = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	descriptorWrite.pImageInfo          = NULL;
-	descriptorWrite.pBufferInfo         = &writeBufferInfo;
-	descriptorWrite.pTexelBufferView    = NULL;
-
-	vkUpdateDescriptorSets(vk->device.path, 1, &descriptorWrite, 0, NULL);
 }
 
 static void	kdo_initSampler(Kdo_Vulkan *vk)

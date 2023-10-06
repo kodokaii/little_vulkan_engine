@@ -902,11 +902,7 @@ const char* parse_usemtl(fastObjData* data, const char* ptr)
     /* If doesn't exist, create a default one with this name
        Note: this case happens when OBJ doesn't have its MTL */
     if (idx == array_size(data->mesh->materials))
-    {
-        fastObjMaterial new_mtl = mtl_default();
-        new_mtl.name = string_copy(s, e);
-        array_push(data->mesh->materials, new_mtl);
-    }
+		idx	= 0;
 
     data->material = idx;
 
@@ -1438,6 +1434,8 @@ fastObjMesh* fast_obj_read_with_callbacks(const char* path, const fastObjCallbac
     array_push(m->normals, 1.0f);
 
     array_push(m->textures, map_default());
+
+	array_push(m->materials, mtl_default());
 
 
     /* Data needed during parsing */

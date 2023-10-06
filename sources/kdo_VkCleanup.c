@@ -58,7 +58,7 @@ void	kdo_cleanup(Kdo_Vulkan *vk, char *msg, int returnCode)
 		vkDeviceWaitIdle(vk->device.path);
 
 	kdo_vkFreeSetBuffer(vk, &vk->core.buffer.vector2);
-	kdo_vkFreeSetBuffer(vk, &vk->core.buffer.vector3);
+	kdo_vkFreeSetBuffer(vk, &vk->core.buffer.vector4);
 	kdo_vkFreeSetBuffer(vk, &vk->core.buffer.material);
 	kdo_vkFreeBuffer(vk, &vk->core.buffer.light);
 	kdo_vkFreeBuffer(vk, &vk->core.buffer.vertex);

@@ -54,9 +54,9 @@ static void kdo_updateDescriptor(Kdo_Vulkan *vk)
 	writeBufferInfo[0].offset	= 0;
 	writeBufferInfo[0].range	= kdo_getGPUBufferSize(vk->core.buffer.object);
 
-	writeBufferInfo[1].buffer	= kdo_getGPUBuffer(vk->core.buffer.vector3);
+	writeBufferInfo[1].buffer	= kdo_getGPUBuffer(vk->core.buffer.vector4);
 	writeBufferInfo[1].offset	= 0;
-	writeBufferInfo[1].range	= kdo_getGPUBufferSize(vk->core.buffer.vector3);
+	writeBufferInfo[1].range	= kdo_getGPUBufferSize(vk->core.buffer.vector4);
 
 	writeBufferInfo[2].buffer	= kdo_getGPUBuffer(vk->core.buffer.vector2);
 	writeBufferInfo[2].offset	= 0;
@@ -138,18 +138,19 @@ static uint32_t	kdo_calculateNormal(Kdo_Vulkan *vk, Kdo_VkVertex vertex[3])
 	vec3		pos3;
 	vec3		deltaPos1;
 	vec3		deltaPos2;
-	vec3		normal;
+	vec4		normal;
 	uint32_t	index;
 
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[0].posIndex], pos1);
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[1].posIndex], pos2);
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[2].posIndex], pos3);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[0].posIndex], pos1);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[1].posIndex], pos2);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[2].posIndex], pos3);
 
 	glm_vec3_sub(pos2, pos1, deltaPos1);
 	glm_vec3_sub(pos3, pos1, deltaPos2);
 	glm_vec3_crossn(deltaPos1, deltaPos2, normal);
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, normal, &index);
+	normal[3] = 0;
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, normal, &index);
 
 	return (index);
 }
@@ -160,18 +161,18 @@ static void	kdo_calculateRawTangent(Kdo_Vulkan *vk, Kdo_VkVertex vertex[3], vec3
 	vec3	pos2;
 	vec3	pos3;
 
-	vec2	uv1;
-	vec2	uv2;
-	vec2	uv3;
+	vec3	uv1;
+	vec3	uv2;
+	vec3	uv3;
 	vec3    deltaPos1;
 	vec3    deltaPos2;
 	vec2    deltaUV1;
 	vec2    deltaUV2;
 	float   factor;
 	
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[0].posIndex], pos1);
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[1].posIndex], pos2);
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex[2].posIndex], pos3);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[0].posIndex], pos1);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[1].posIndex], pos2);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex[2].posIndex], pos3);
 	
 	glm_vec2_copy(((vec2 *)kdo_getCPUBuffer(vk->core.buffer.vector2))[vertex[0].uvIndex], uv1);
 	glm_vec2_copy(((vec2 *)kdo_getCPUBuffer(vk->core.buffer.vector2))[vertex[1].uvIndex], uv2);
@@ -193,16 +194,16 @@ static uint32_t	kdo_calculateTangent(Kdo_Vulkan *vk, Kdo_VkVertex vertex, vec3 r
 {
 	vec3			normal;
 	vec3            adjustVector;
-	vec3			tangent;
+	vec4			tangent;
 	uint32_t		index;
-
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex.normalIndex], normal);
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex.normalIndex], normal);
 
 	glm_vec3_proj(rawTangent, normal, adjustVector);
 	glm_vec3_sub(rawTangent, adjustVector, tangent);
 	glm_vec3_normalize(tangent);
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, tangent, &index);
+	tangent[3]	= 0;
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, tangent, &index);
 
 	return (index);
 }
@@ -211,15 +212,16 @@ static uint32_t	kdo_calculateBitangent(Kdo_Vulkan *vk, Kdo_VkVertex vertex)
 {
 	vec3		normal;
 	vec3		tangent;
-	vec3		bitangent;
+	vec4		bitangent;
 	uint32_t	index;
 
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex.normalIndex], normal);	
-	glm_vec3_copy(((vec3 *)kdo_getCPUBuffer(vk->core.buffer.vector3))[vertex.tangentIndex], tangent);	
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex.normalIndex], normal);	
+	glm_vec3(((vec4 *)kdo_getCPUBuffer(vk->core.buffer.vector4))[vertex.tangentIndex], tangent);	
 
 	glm_vec3_crossn(normal, tangent, bitangent);
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, bitangent, &index);
+	bitangent[3] = 0;
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, bitangent, &index);
 
 	return (index);
 }
@@ -230,19 +232,13 @@ VkResult	kdo_initObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t m
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
 	KDO_VK_ALLOC(objectInfo->vertex, calloc(maxVertexCount, sizeof (Kdo_VkVertex)));
-	KDO_VK_ALLOC(objectInfo->pos.matchArray, calloc(maxPosCount, sizeof (uint32_t)));
-	if (maxTangentCount)
-		KDO_VK_ALLOC(objectInfo->tangent.matchArray, calloc(maxTangentCount, sizeof (uint32_t)));
-	if (maxBitangentCount)
-		KDO_VK_ALLOC(objectInfo->bitangent.matchArray, calloc(maxBitangentCount, sizeof (uint32_t)));
-	if (maxNormalCount)
-		KDO_VK_ALLOC(objectInfo->normal.matchArray, calloc(maxNormalCount, sizeof (uint32_t)));
-	if (maxUvCount)
-		KDO_VK_ALLOC(objectInfo->uv.matchArray, calloc(maxUvCount, sizeof (uint32_t)));
-	if (maxMaterialCount)
-		KDO_VK_ALLOC(objectInfo->material.matchArray, calloc(maxMaterialCount, sizeof (uint32_t)));
-	if (maxTextureCount)
-		KDO_VK_ALLOC(objectInfo->texture.matchArray, calloc(maxTextureCount, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->pos.matchArray, calloc(maxPosCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->tangent.matchArray, calloc(maxTangentCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->bitangent.matchArray, calloc(maxBitangentCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->normal.matchArray, calloc(maxNormalCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->uv.matchArray, calloc(maxUvCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->material.matchArray, calloc(maxMaterialCount + 1, sizeof (uint32_t)));
+	KDO_VK_ALLOC(objectInfo->texture.matchArray, calloc(maxTextureCount + 1, sizeof (uint32_t)));
 
 	glm_mat4_identity(objectInfo->object.modelMat);
 	glm_mat4_identity(objectInfo->object.normalMat);
@@ -259,59 +255,59 @@ VkResult	kdo_initObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t m
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addPosObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 pos)
+VkResult	kdo_addPosObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec4 pos)
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->pos.maxCount <= index)
+	if (!index || objectInfo->pos.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, pos, &matchIndex);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, pos, &matchIndex);
 	
 	objectInfo->pos.matchArray[index] = matchIndex;
 
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addTangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 tangent)
+VkResult	kdo_addTangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec4 tangent)
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->tangent.maxCount <= index)
+	if (!index || objectInfo->tangent.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
 	glm_vec3_normalize(tangent);
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, tangent, &matchIndex);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, tangent, &matchIndex);
 	
 	objectInfo->tangent.matchArray[index] = matchIndex;
 
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addBitangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 bitangent)
+VkResult	kdo_addBitangentObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec4 bitangent)
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->bitangent.maxCount <= index)
+	if (!index || objectInfo->bitangent.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
 	glm_vec3_normalize(bitangent);
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, bitangent, &matchIndex);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, bitangent, &matchIndex);
 	
 	objectInfo->bitangent.matchArray[index] = matchIndex;
 
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addNormalObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec3 normal)
+VkResult	kdo_addNormalObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, vec4 normal)
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->normal.maxCount <= index)
+	if (!index || objectInfo->normal.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
 	glm_vec3_normalize(normal);
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, normal, &matchIndex);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, normal, &matchIndex);
 	
 	objectInfo->normal.matchArray[index] = matchIndex;
 
@@ -322,9 +318,10 @@ VkResult	kdo_addUvObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t 
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->uv.maxCount <= index)
+	if (!index || objectInfo->uv.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
+	uv[1]	= 1 - uv[1];
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector2, uv, &matchIndex);
 	
 	objectInfo->uv.matchArray[index] = matchIndex;
@@ -336,7 +333,7 @@ VkResult	kdo_addTextureObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint
 {
 	uint32_t	matchIndex;
 
-	if (objectInfo->texture.maxCount <= index)
+	if (!index || objectInfo->texture.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
 	kdo_vkPushSetImageBufferPath(vk, &vk->core.buffer.texture, path, &matchIndex);
@@ -346,91 +343,106 @@ VkResult	kdo_addTextureObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addMaterialObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial material)
+VkResult	kdo_addMaterialObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, uint32_t index, Kdo_VkMaterial *materialIn)
 {
-	uint32_t	matchIndex;
+	Kdo_VkMaterial	materialOut;
+	uint32_t		matchIndex;
 
-	if (objectInfo->material.maxCount <= index)
+	if (!index || objectInfo->material.maxCount < index)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
-	material.ambientMap				= objectInfo->texture.matchArray[material.ambientMap];
-	material.diffuseMap				= objectInfo->texture.matchArray[material.diffuseMap];
-	material.specularMap			= objectInfo->texture.matchArray[material.specularMap];
-	material.emissiveMap			= objectInfo->texture.matchArray[material.emissiveMap];
-	material.transmittanceMap		= objectInfo->texture.matchArray[material.transmittanceMap];
-	material.transmissionFilterMap	= objectInfo->texture.matchArray[material.transmissionFilterMap];
-	material.shininessMap			= objectInfo->texture.matchArray[material.shininessMap];
-	material.disolveMap				= objectInfo->texture.matchArray[material.disolveMap];
-	material.bumpMap				= objectInfo->texture.matchArray[material.bumpMap];
+	glm_vec3_copy(materialIn->ambient, materialOut.ambient);
+	glm_vec3_copy(materialIn->diffuse, materialOut.diffuse);
+	glm_vec3_copy(materialIn->specular, materialOut.specular);
+	glm_vec3_copy(materialIn->emissive, materialOut.emissive);
+	glm_vec3_copy(materialIn->transmittance, materialOut.transmittance);
+	glm_vec3_copy(materialIn->transmissionFilter, materialOut.transmissionFilter);
+	materialOut.shininess				= materialIn->shininess;
+	materialOut.refractionIndex			= materialIn->refractionIndex;
+	materialOut.disolve					= materialIn->disolve;
+	materialOut.illum					= materialIn->illum;
+	materialOut.ambientMap				= objectInfo->texture.matchArray[materialIn->ambientMap];
+	materialOut.diffuseMap				= objectInfo->texture.matchArray[materialIn->diffuseMap];
+	materialOut.specularMap				= objectInfo->texture.matchArray[materialIn->specularMap];
+	materialOut.emissiveMap				= objectInfo->texture.matchArray[materialIn->emissiveMap];
+	materialOut.transmittanceMap		= objectInfo->texture.matchArray[materialIn->transmittanceMap];
+	materialOut.transmissionFilterMap	= objectInfo->texture.matchArray[materialIn->transmissionFilterMap];
+	materialOut.shininessMap			= objectInfo->texture.matchArray[materialIn->shininessMap];
+	materialOut.disolveMap				= objectInfo->texture.matchArray[materialIn->disolveMap];
+	materialOut.bumpMap					= objectInfo->texture.matchArray[materialIn->bumpMap];
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.material, &material, &matchIndex);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.material, &materialOut, &matchIndex);
 	
 	objectInfo->material.matchArray[index] = matchIndex;
 
 	return (VK_SUCCESS);
 }
 
-VkResult	kdo_addTriangleObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertex[3])
+VkResult	kdo_addTriangleObject(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, Kdo_VkVertex vertexIn[3])
 {
-	int			validUv;
-	vec3		rawTangent;
+	Kdo_VkVertex	*vertexOut;	
+	int				validUv;
+	vec3			rawTangent;
 
-	if (!vertex[0].posIndex || !vertex[1].posIndex || !vertex[2].posIndex)
+	vertexOut	= objectInfo->vertex + objectInfo->vertexCount;
+
+	if (!vertexIn[0].posIndex || !vertexIn[1].posIndex || !vertexIn[2].posIndex)
 		return (VK_ERROR_NOT_PERMITTED_KHR);
 
-	objectInfo->vertex[objectInfo->vertexCount + 0].posIndex			= objectInfo->pos.matchArray[vertex[0].posIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 1].posIndex			= objectInfo->pos.matchArray[vertex[1].posIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 2].posIndex			= objectInfo->pos.matchArray[vertex[2].posIndex];
+	vertexOut[0].posIndex		= objectInfo->pos.matchArray[vertexIn[0].posIndex];
+	vertexOut[1].posIndex		= objectInfo->pos.matchArray[vertexIn[1].posIndex];
+	vertexOut[2].posIndex		= objectInfo->pos.matchArray[vertexIn[2].posIndex];
 
 
-	validUv = vertex[0].uvIndex && vertex[1].uvIndex && vertex[2].uvIndex;
+	validUv = vertexIn[0].uvIndex && vertexIn[1].uvIndex && vertexIn[2].uvIndex;
 
-	objectInfo->vertex[objectInfo->vertexCount + 0].uvIndex				= objectInfo->uv.matchArray[vertex[0].uvIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 1].uvIndex				= objectInfo->uv.matchArray[vertex[1].uvIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 2].uvIndex				= objectInfo->uv.matchArray[vertex[2].uvIndex];
-
-
-	if (!vertex[0].normalIndex || !vertex[1].normalIndex || !vertex[2].normalIndex)
-		objectInfo->normal.matchArray[0] = kdo_calculateNormal(vk, vertex);
-
-	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 0].normalIndex			= objectInfo->normal.matchArray[vertex[0].normalIndex];
+	vertexOut[0].uvIndex		= objectInfo->uv.matchArray[vertexIn[0].uvIndex];
+	vertexOut[1].uvIndex		= objectInfo->uv.matchArray[vertexIn[1].uvIndex];
+	vertexOut[2].uvIndex		= objectInfo->uv.matchArray[vertexIn[2].uvIndex];
 
 
-	if (validUv && (!vertex[0].tangentIndex || !vertex[1].tangentIndex || !vertex[2].tangentIndex))
-		kdo_calculateRawTangent(vk, vertex, rawTangent);
-	if (validUv && !vertex[0].tangentIndex)
-		objectInfo->vertex[objectInfo->vertexCount + 0].tangentIndex   = kdo_calculateTangent(vk, vertex[0], rawTangent);
+	if (!vertexIn[0].normalIndex || !vertexIn[1].normalIndex || !vertexIn[2].normalIndex)
+		objectInfo->normal.matchArray[0] = kdo_calculateNormal(vk, vertexOut);
+
+	vertexOut[0].normalIndex	= objectInfo->normal.matchArray[vertexIn[0].normalIndex];
+	vertexOut[1].normalIndex	= objectInfo->normal.matchArray[vertexIn[1].normalIndex];
+	vertexOut[2].normalIndex	= objectInfo->normal.matchArray[vertexIn[2].normalIndex];
+
+
+	if (validUv && (!vertexIn[0].tangentIndex || !vertexIn[1].tangentIndex || !vertexIn[2].tangentIndex))
+		kdo_calculateRawTangent(vk, vertexOut, rawTangent);
+
+	if (validUv && !vertexIn[0].tangentIndex)
+		vertexOut[0].tangentIndex   = kdo_calculateTangent(vk, vertexOut[0], rawTangent);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 0].tangentIndex   = objectInfo->tangent.matchArray[vertex[0].tangentIndex];
-	if (validUv && !vertex[1].tangentIndex)
-		objectInfo->vertex[objectInfo->vertexCount + 1].tangentIndex   = kdo_calculateTangent(vk, vertex[1], rawTangent);
+		vertexOut[0].tangentIndex   = objectInfo->tangent.matchArray[vertexIn[0].tangentIndex];
+	if (validUv && !vertexIn[1].tangentIndex)
+		vertexOut[1].tangentIndex   = kdo_calculateTangent(vk, vertexOut[1], rawTangent);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 1].tangentIndex   = objectInfo->tangent.matchArray[vertex[1].tangentIndex];
-	if (validUv && !vertex[2].tangentIndex)
-		objectInfo->vertex[objectInfo->vertexCount + 2].tangentIndex   = kdo_calculateTangent(vk, vertex[2], rawTangent);
+		vertexOut[1].tangentIndex   = objectInfo->tangent.matchArray[vertexIn[1].tangentIndex];
+	if (validUv && !vertexIn[2].tangentIndex)
+		vertexOut[2].tangentIndex   = kdo_calculateTangent(vk, vertexOut[2], rawTangent);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 2].tangentIndex   = objectInfo->tangent.matchArray[vertex[2].tangentIndex];
+		vertexOut[2].tangentIndex   = objectInfo->tangent.matchArray[vertexIn[2].tangentIndex];
 
 
-	if (!vertex[0].bitangentIndex)
-		 objectInfo->vertex[objectInfo->vertexCount + 0].bitangentIndex	= kdo_calculateBitangent(vk, vertex[0]);
+	if (!vertexIn[0].bitangentIndex)
+		 vertexOut[0].bitangentIndex	= kdo_calculateBitangent(vk, vertexOut[0]);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 0].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[0].bitangentIndex];
-	if (!vertex[1].bitangentIndex)
-		 objectInfo->vertex[objectInfo->vertexCount + 1].bitangentIndex	= kdo_calculateBitangent(vk, vertex[1]);
+		vertexOut[0].bitangentIndex	=  objectInfo->bitangent.matchArray[vertexIn[0].bitangentIndex];
+	if (!vertexIn[1].bitangentIndex)
+		 vertexOut[1].bitangentIndex	= kdo_calculateBitangent(vk, vertexOut[1]);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 1].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[1].bitangentIndex];
-	if (!vertex[2].bitangentIndex)
-		 objectInfo->vertex[objectInfo->vertexCount + 2].bitangentIndex	= kdo_calculateBitangent(vk, vertex[2]);
+		vertexOut[1].bitangentIndex	=  objectInfo->bitangent.matchArray[vertexIn[1].bitangentIndex];
+	if (!vertexIn[2].bitangentIndex)
+		 vertexOut[2].bitangentIndex	= kdo_calculateBitangent(vk, vertexOut[2]);
 	else
-		objectInfo->vertex[objectInfo->vertexCount + 2].bitangentIndex	=  objectInfo->bitangent.matchArray[vertex[2].bitangentIndex];
+		vertexOut[2].bitangentIndex	=  objectInfo->bitangent.matchArray[vertexIn[2].bitangentIndex];
 
 
-	objectInfo->vertex[objectInfo->vertexCount + 0].mtlIndex			= objectInfo->material.matchArray[vertex[0].mtlIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 1].mtlIndex			= objectInfo->material.matchArray[vertex[1].mtlIndex];
-	objectInfo->vertex[objectInfo->vertexCount + 2].mtlIndex			= objectInfo->material.matchArray[vertex[2].mtlIndex];
+	vertexOut[0].mtlIndex	= objectInfo->material.matchArray[vertexIn[0].mtlIndex];
+	vertexOut[1].mtlIndex	= objectInfo->material.matchArray[vertexIn[1].mtlIndex];
+	vertexOut[2].mtlIndex	= objectInfo->material.matchArray[vertexIn[2].mtlIndex];
 
 	objectInfo->vertexCount += 3;
 
@@ -462,7 +474,7 @@ VkResult	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *
 	{
 		info[i].object.drawCommand.vertexCount		= info[i].vertexCount;
 		info[i].object.drawCommand.instanceCount	= 1;
-		info[i].object.drawCommand.firstVertex		= kdo_getCPUBufferSize(vk->core.buffer.vertex);
+		info[i].object.drawCommand.firstVertex		= kdo_getCPUBufferSize(vk->core.buffer.vertex) / sizeof(Kdo_VkVertex);
 		info[i].object.drawCommand.firstInstance	= vk->core.objectCount + i;
 
 		kdo_vkPushBufferData(vk, &vk->core.buffer.vertex, info[i].vertex, info[i].vertexCount * sizeof(Kdo_VkVertex));
@@ -470,21 +482,15 @@ VkResult	kdo_loadObject(Kdo_Vulkan *vk, uint32_t objectCount, Kdo_VkObjectInfo *
 
 		KDO_FREE(info[i].vertex);
 		KDO_FREE(info[i].pos.matchArray);
-		if (info[i].tangent.maxCount)
-			KDO_FREE(info[i].tangent.matchArray);
-		if (info[i].bitangent.maxCount)
-			KDO_FREE(info[i].bitangent.matchArray);
-		if (info[i].normal.maxCount)
-			KDO_FREE(info[i].normal.matchArray);
-		if (info[i].uv.maxCount)
-			KDO_FREE(info[i].uv.matchArray);
-		if (info[i].material.maxCount)
-			KDO_FREE(info[i].material.matchArray);
-		if (info[i].texture.maxCount)
-			KDO_FREE(info[i].texture.matchArray);
+		KDO_FREE(info[i].tangent.matchArray);
+		KDO_FREE(info[i].bitangent.matchArray);
+		KDO_FREE(info[i].normal.matchArray);
+		KDO_FREE(info[i].uv.matchArray);
+		KDO_FREE(info[i].material.matchArray);
+		KDO_FREE(info[i].texture.matchArray);
 	}
 
-	kdo_vkUpdateSetBuffer(vk, &vk->core.buffer.vector3);
+	kdo_vkUpdateSetBuffer(vk, &vk->core.buffer.vector4);
 	kdo_vkUpdateSetBuffer(vk, &vk->core.buffer.vector2);
 	kdo_vkUpdateSetBuffer(vk, &vk->core.buffer.material);
 	kdo_vkUpdateSetImageBuffer(vk, &vk->core.buffer.texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

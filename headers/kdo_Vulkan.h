@@ -237,7 +237,7 @@ typedef struct Kdo_VkFence
 
 typedef struct Kdo_VkBufferCore
 {
-	Kdo_VkSetBuffer			vector3;
+	Kdo_VkSetBuffer			vector4;
 	Kdo_VkSetBuffer			vector2;
 	Kdo_VkSetBuffer			material;
 	Kdo_VkSetImageBuffer	texture;

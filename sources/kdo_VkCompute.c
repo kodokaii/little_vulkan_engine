@@ -20,9 +20,8 @@ static void	kdo_updateCamera(Kdo_Vulkan *vk)
 	vec3	right;
 	vec3	front;
 	vec3	top = {0.0f, 0.0f, -1.0f};
-
-	glfwGetCursorPos(vk->window.path, &xCurrentMousse, &yCurrentMousse);
-	vk->camera.yaw	= vk->camera.yaw + ((xCurrentMousse - vk->camera.xMouse) * sensitivity);
+glfwGetCursorPos(vk->window.path, &xCurrentMousse, &yCurrentMousse);
+	vk->camera.yaw		= vk->camera.yaw + ((xCurrentMousse - vk->camera.xMouse) * sensitivity);
 	vk->camera.pitch	= glm_clamp(vk->camera.pitch + ((yCurrentMousse - vk->camera.yMouse) * sensitivity), glm_rad(-89.99), glm_rad(89.99));
 	watch[0] = cos(vk->camera.pitch) * cos(vk->camera.yaw);
 	watch[1] = cos(vk->camera.pitch) * sin(vk->camera.yaw);
@@ -88,12 +87,20 @@ void kdo_compute(Kdo_Vulkan *vk)
 
 	if (vk->compute.startTime == 0)
 	{
-		Kdo_VkObjectInfo	objectInfo[1];
+		Kdo_VkObjectInfo	objectInfo[2];
+		mat4				mat[2];
 
 		kdo_vkUpdateAllBuffer(vk, &vk->core.buffer.light);
 
-		kdo_openObject(vk, "obj/viking_room.obj", objectInfo);
-		kdo_loadObject(vk, 1, objectInfo);
+		kdo_openObject(vk, "obj/bugatti/bugatti.obj", objectInfo);
+		kdo_openObject(vk, "obj/aircraft/aircraft.obj", objectInfo + 1);
+		kdo_loadObject(vk, 2, objectInfo);
+
+		kdo_createMat(mat[0], mat[1], GLM_VEC3_ZERO, (vec3){glm_rad(-90), 0, 0}, (vec3){1, 1, 1});
+		kdo_vkWriteBufferData(vk, &vk->core.buffer.object, 0, mat, sizeof(mat));
+		kdo_createMat(mat[0], mat[1], (vec3){0, 0, -10}, (vec3){glm_rad(90), glm_rad(-10), glm_rad(180)}, (vec3){2, 2, 2});
+		kdo_vkWriteBufferData(vk, &vk->core.buffer.object, sizeof(Kdo_VkObject), mat, sizeof(mat));
+		kdo_vkUpdateBuffer(vk, &vk->core.buffer.object, 0, sizeof(Kdo_VkObject) + sizeof(mat));
 
 		vk->compute.startTime = vk->compute.currentTime;
 	}

@@ -58,11 +58,11 @@ int	main(int argc, char *argv[])
 	vk.info.queuesInfo[TRANSFER_QUEUE].presentSupport	= 0;
 
 	vk.info.presentMode							= VK_PRESENT_MODE_MAILBOX_KHR;
-	vk.info.startPos[0]							= -2.0f;
-	vk.info.startPos[1]							= -1.0f;
-	vk.info.startPos[2]							= -1.0f;
-	vk.info.startYaw							= 0.0f;
-	vk.info.startPitch							= 0.0f;
+	vk.info.startPos[0]							= 5.0f;
+	vk.info.startPos[1]							= 5.0f;
+	vk.info.startPos[2]							= -5.0f;
+	vk.info.startYaw							= glm_rad(225);
+	vk.info.startPitch							= glm_rad(45);
 
 	kdo_initGlfw(&vk);
 	kdo_initVulkan(&vk);

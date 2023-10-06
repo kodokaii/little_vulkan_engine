@@ -59,9 +59,9 @@ static void kdo_initDescriptorPool(Kdo_Vulkan *vk)
 static void kdo_initBuffer(Kdo_Vulkan *vk)
 {
 	uint32_t		indexNull;
-	vec3			defaultVec3		=	{0, 0, 0};
-	vec2			defaultVec2		=	{0, 0};
-	Kdo_VkMaterial  defaultMtl		=  {{0, 0, 0}, 0,  //ambient
+	vec4			defaultVec4		=	{1, 1, 1, 0};
+	vec2			defaultVec2		=	{1, 1};
+	Kdo_VkMaterial  defaultMtl		=  {{1, 1, 1}, 0,  //ambient
 										{1, 1, 1}, 0,   //diffuse
 										{1, 1, 1}, 0,   //specular
 										{1, 1, 1}, 0,   //emissive
@@ -72,21 +72,21 @@ static void kdo_initBuffer(Kdo_Vulkan *vk)
 										1, 0,           //disolve
 										1,              //illum
 										0};             //bumpMap
-	Kdo_VkLight		defaultLight	=  {{5.0f, 0.0f, -10.0f, 10.0f},
+	Kdo_VkLight		defaultLight	=  {{5.0f, 5.0f, -20.0f, 10.0f},
 									    {1.0f, 1.0f, 1.0f, 1.0f}};
 	char			*defaultTexture;
 
 	KDO_VK_ALLOC(defaultTexture, strdup("textures/default.png"));
 
-	kdo_vkNewSetBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(vec3), sizeof(vec3), &vk->core.buffer.vector3);
+	kdo_vkNewSetBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(vec4), sizeof(vec4), &vk->core.buffer.vector4);
 	kdo_vkNewSetBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(vec2), sizeof(vec2), &vk->core.buffer.vector2);
 	kdo_vkNewSetBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkMaterial), sizeof(Kdo_VkMaterial), &vk->core.buffer.material);
-	kdo_vkNewSetImageBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, MAX_TEXTURE, 128, &vk->core.buffer.texture);
+	kdo_vkNewSetImageBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, MAX_TEXTURE, 512, &vk->core.buffer.texture);
 	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkLight), &vk->core.buffer.light);
 	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, sizeof(Kdo_VkVertex), &vk->core.buffer.vertex);
 	kdo_vkNewBuffer(vk, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Kdo_VkObject), &vk->core.buffer.object);
 
-	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector3, defaultVec3, &indexNull);
+	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector4, defaultVec4, &indexNull);
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.vector2, defaultVec2, &indexNull);
 	kdo_vkPushSetBufferData(vk, &vk->core.buffer.material, &defaultMtl, &indexNull);
 	kdo_vkPushSetImageBufferPath(vk, &vk->core.buffer.texture, defaultTexture, &indexNull);

@@ -230,7 +230,7 @@ void kdo_initGraphicsPipeline(Kdo_Vulkan *vk)
 	rasterizerInfo.rasterizerDiscardEnable		= VK_FALSE;
 	rasterizerInfo.polygonMode					= VK_POLYGON_MODE_FILL;
 	rasterizerInfo.cullMode						= VK_CULL_MODE_BACK_BIT; 
-	rasterizerInfo.frontFace					= VK_FRONT_FACE_CLOCKWISE;
+	rasterizerInfo.frontFace					= VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizerInfo.depthBiasEnable				= VK_FALSE;
 	rasterizerInfo.depthBiasConstantFactor		= 0.0;
 	rasterizerInfo.depthBiasClamp				= 0.0;

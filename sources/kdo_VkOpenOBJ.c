@@ -25,42 +25,70 @@ static uint32_t	kdo_triangleCount(fastObjMesh *mesh)
 	return (triangleCount);
 }
 
-static Kdo_VkMaterial	kdo_getMaterial(fastObjMesh *mesh, uint32_t index)
+static void	kdo_loadComponent(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObjMesh *mesh)
 {
+	vec4			pos;
+	vec4			normal;
+	vec2			uv;
 	Kdo_VkMaterial	material;
+	char			*texture;
+	uint32_t	i;
 
-	glm_vec3_make(mesh->materials[index].Ka, material.ambient);
-	glm_vec3_make(mesh->materials[index].Kd, material.diffuse);
-	glm_vec3_make(mesh->materials[index].Ks, material.specular);
-	glm_vec3_make(mesh->materials[index].Ke, material.emissive);
-	glm_vec3_make(mesh->materials[index].Kt, material.transmittance);
-	glm_vec3_make(mesh->materials[index].Tf, material.transmissionFilter);
-	material.ambientMap				= mesh->materials[index].map_Ka;
-	material.diffuseMap				= mesh->materials[index].map_Kd;
-	material.specularMap			= mesh->materials[index].map_Ks;
-	material.emissiveMap			= mesh->materials[index].map_Ke;
-	material.transmittanceMap		= mesh->materials[index].map_Kt;
-	material.transmissionFilterMap	= 0;
-	material.shininess				= mesh->materials[index].Ns;
-	material.refractionIndex		= mesh->materials[index].Ni;
-	material.disolve				= mesh->materials[index].d;
-	material.illum					= mesh->materials[index].illum;
 
-	return (material);
-}
+	pos[3]	= 0;
+	for (i = 1; i < mesh->position_count; i++)
+	{
+		glm_vec3_copy(((vec3 *)mesh->positions)[i], pos);
+		kdo_addPosObject(vk, objectInfo, i, pos);
+	}
 
-static char	*kdo_getTexture(Kdo_Vulkan *vk, fastObjMesh *mesh, uint32_t index)
-{
-	char	*texturePath;
+	normal[3]	= 0;
+	for (i = 1; i < mesh->normal_count; i++)
+	{
+		glm_vec3_copy(((vec3 *)mesh->normals)[i], normal);
+		kdo_addNormalObject(vk, objectInfo, i, normal);
+	}
+	for (i = 1; i < mesh->texcoord_count; i++)
+	{
+		glm_vec2_copy(((vec2 *)mesh->texcoords)[i], uv);
+		kdo_addUvObject(vk, objectInfo, i, uv);
+	}
 
-	KDO_VK_ALLOC(texturePath, strdup(mesh->textures[index].path));
+	for (i = 1; i < mesh->texture_count; i++)
+	{
+		KDO_VK_ALLOC(texture, strdup(mesh->textures[i].path));
+		kdo_addTextureObject(vk, objectInfo, i, texture);
+	}
 
-	return (texturePath);
+	for (i = 1; i < mesh->material_count; i++)
+	{
+		glm_vec3_make(mesh->materials[i].Ka, material.ambient);
+		glm_vec3_make(mesh->materials[i].Kd, material.diffuse);
+		glm_vec3_make(mesh->materials[i].Ks, material.specular);
+		glm_vec3_make(mesh->materials[i].Ke, material.emissive);
+		glm_vec3_make(mesh->materials[i].Kt, material.transmittance);
+		glm_vec3_make(mesh->materials[i].Tf, material.transmissionFilter);
+		material.ambientMap				= mesh->materials[i].map_Ka;
+		material.diffuseMap				= mesh->materials[i].map_Kd;
+		material.specularMap			= mesh->materials[i].map_Ks;
+		material.emissiveMap			= mesh->materials[i].map_Ke;
+		material.transmittanceMap		= mesh->materials[i].map_Kt;
+		material.transmissionFilterMap	= 0;
+		material.shininess				= mesh->materials[i].Ns;
+		material.shininessMap			= mesh->materials[i].map_Ns;
+		material.refractionIndex		= mesh->materials[i].Ni;
+		material.refractionMap			= mesh->materials[i].map_Ni;
+		material.disolve				= mesh->materials[i].d;
+		material.disolveMap				= mesh->materials[i].map_d;
+		material.illum					= mesh->materials[i].illum;
+		material.bumpMap				= mesh->materials[i].map_bump;
+		kdo_addMaterialObject(vk, objectInfo, i, &material);
+	}
 }
 
 static void	kdo_loadVertex(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObjMesh *mesh)
 {
-	Kdo_VkVertex	vertex[3] = {};
+	Kdo_VkVertex	vertex[3];
 	fastObjIndex	vertex1;
 	fastObjIndex	vertex2;
 	fastObjIndex	vertex3;
@@ -68,6 +96,13 @@ static void	kdo_loadVertex(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObj
 	uint32_t		currentVertex;
 	uint32_t		currentVertexInFace;
 
+	vertex[0].tangentIndex		= 0;
+	vertex[1].tangentIndex		= 0;
+	vertex[2].tangentIndex		= 0;
+
+	vertex[0].bitangentIndex	= 0;
+	vertex[1].bitangentIndex	= 0;
+	vertex[2].bitangentIndex	= 0;
 
 	currentFace			= 0;
 	currentVertex		= 0;
@@ -108,22 +143,13 @@ static void	kdo_loadVertex(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, fastObj
 VkResult    kdo_openObj(Kdo_Vulkan *vk, Kdo_VkObjectInfo *objectInfo, char *objPath)
 {
 	fastObjMesh		*mesh;
-	uint32_t		i;
 	
-	mesh = fast_obj_read(objPath);
+	if (!(mesh = fast_obj_read(objPath)))
+		return (VK_ERROR_UNKNOWN);
 	
-	kdo_initObject(vk, objectInfo, kdo_triangleCount(mesh) * 3, mesh->position_count, 0, 0, mesh->normal_count, mesh->texcoord_count, mesh->material_count, mesh->texture_count);
+	kdo_initObject(vk, objectInfo, kdo_triangleCount(mesh) * 3, mesh->position_count - 1, 0, 0, mesh->normal_count - 1, mesh->texcoord_count - 1, mesh->material_count - 1, mesh->texture_count - 1);
 
-	for (i = 1; i < mesh->position_count; i++)
-		kdo_addPosObject(vk, objectInfo, i, ((vec3 *)mesh->positions)[i]);
-	for (i = 1; i < mesh->normal_count; i++)
-		kdo_addNormalObject(vk, objectInfo, i, ((vec3 *)mesh->normals)[i]);
-	for (i = 1; i < mesh->texcoord_count; i++)
-		kdo_addUvObject(vk, objectInfo, i, ((vec2 *)mesh->texcoords)[i]);
-	for (i = 1; i < mesh->material_count; i++)
-		kdo_addMaterialObject(vk, objectInfo, i, kdo_getMaterial(mesh, i));
-	for (i = 1; i < mesh->texture_count; i++)
-		kdo_addTextureObject(vk, objectInfo, i, kdo_getTexture(vk, mesh, i));
+	kdo_loadComponent(vk, objectInfo, mesh);
 	
 	kdo_loadVertex(vk, objectInfo, mesh);
 

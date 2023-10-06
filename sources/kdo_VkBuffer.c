@@ -481,7 +481,7 @@ VkResult	kdo_pushGPUBuffer(VkDevice device, VkPhysicalDeviceMemoryProperties mem
 {
 	VkResult        returnCode;
 
-	if (buffer->memory.size < buffer->fillSize + dataSize)
+	if (buffer->info.size < buffer->fillSize + dataSize)
 		kdo_reallocGPUBuffer(device, memoryProperties, commandPool, queue, buffer, buffer->fillSize + dataSize);
 
 	KDO_VK_ASSERT(kdo_writeGPUBuffer(device, memoryProperties, commandPool, queue, buffer, buffer->fillSize, data, dataSize));
@@ -494,7 +494,6 @@ VkResult	kdo_reallocGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProper
 {
 	Kdo_VkGPUImageBuffer	newImageBuffer;
 	VkResult				returnCode;
-	VkDeviceSize			offset;
 	uint32_t				i;
 
 	newSize	= kdo_maxSize(imageBuffer->memory.size * 2, newSize);
@@ -502,11 +501,9 @@ VkResult	kdo_reallocGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProper
 	KDO_VK_ASSERT(kdo_newGPUImageBuffer(device, memoryProperties, imageBuffer->memory.flags, imageBuffer->memory.waitFlags, newSize, imageBuffer->maxImageCount, &imageBuffer->info, &newImageBuffer));
 
 	i = 0;
-	offset = 0;
-	while (i < imageBuffer->imageCount && offset + imageBuffer->imageArray[i].size <= newSize)
+	while (i < imageBuffer->imageCount && imageBuffer->fillSize + imageBuffer->fillSize % imageBuffer->imageArray[i].alignment + imageBuffer->imageArray[i].size <= newSize)
 	{
 		KDO_VK_ASSERT(kdo_pushGPUImage(device, memoryProperties, commandPool, queue, &newImageBuffer, imageBuffer->imageArray + i));
-		offset	+= offset % imageBuffer->imageArray[i].alignment;
 		i++;
 	}
 
@@ -519,15 +516,17 @@ VkResult	kdo_reallocGPUImageBuffer(VkDevice device, VkPhysicalDeviceMemoryProper
 VkResult	kdo_bindGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties memoryProperties, VkCommandPool commandPool, VkQueue queue, Kdo_VkGPUImageBuffer *imageBuffer, Kdo_VkGPUImage *image)
 {
 	VkImageViewCreateInfo	viewInfo;
+	VkDeviceSize			alignment;
 	VkResult				returnCode;
 
 	if (imageBuffer->maxImageCount <= imageBuffer->imageCount)
 	  return (VK_ERROR_NOT_PERMITTED_EXT);
 
-	imageBuffer->fillSize	+= imageBuffer->fillSize % image->alignment;
-	if (imageBuffer->memory.size < imageBuffer->fillSize + image->size)
-		KDO_VK_ASSERT(kdo_reallocGPUImageBuffer(device, memoryProperties, commandPool, queue, imageBuffer, imageBuffer->fillSize + image->size));
+	alignment	= imageBuffer->fillSize % image->alignment;
+	if (imageBuffer->memory.size < imageBuffer->fillSize + alignment + image->size)
+		KDO_VK_ASSERT(kdo_reallocGPUImageBuffer(device, memoryProperties, commandPool, queue, imageBuffer, imageBuffer->fillSize + alignment + image->size));
 
+	imageBuffer->fillSize	+= alignment;
 	KDO_VK_ASSERT(vkBindImageMemory(device, image->path, imageBuffer->memory.path, imageBuffer->fillSize));
 
 	viewInfo.sType                              = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -567,27 +566,27 @@ VkResult	kdo_pushGPUImage(VkDevice device, VkPhysicalDeviceMemoryProperties memo
 
 	kdo_beginUniqueCommand(device, commandPool, &commandBuffer);
 
-	kdo_cmdImageBarrier(commandBuffer, imageBuffer->imageArray[imageBuffer->imageCount - 1].path, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, imageBuffer->info.initialLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	kdo_cmdImageBarrier(commandBuffer, newImage.path, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, imageBuffer->info.initialLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	kdo_cmdImageBarrier(commandBuffer, image->path, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, image->layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	copyInfo.srcSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-	copyInfo.srcSubresource.mipLevel        = VK_REMAINING_MIP_LEVELS;
+	copyInfo.srcSubresource.mipLevel        = 0;
 	copyInfo.srcSubresource.baseArrayLayer  = 0;
-	copyInfo.srcSubresource.layerCount      = VK_REMAINING_ARRAY_LAYERS;
+	copyInfo.srcSubresource.layerCount      = 1;
 	copyInfo.srcOffset.x                    = 0;
 	copyInfo.srcOffset.y                    = 0;
 	copyInfo.srcOffset.z                    = 0;
 	copyInfo.dstSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-	copyInfo.dstSubresource.mipLevel        = VK_REMAINING_MIP_LEVELS;
+	copyInfo.dstSubresource.mipLevel        = 0;
 	copyInfo.dstSubresource.baseArrayLayer  = 0;
-	copyInfo.dstSubresource.layerCount      = VK_REMAINING_ARRAY_LAYERS;
+	copyInfo.dstSubresource.layerCount      = 1;
 	copyInfo.dstOffset.x                    = 0;
 	copyInfo.dstOffset.y                    = 0;
 	copyInfo.dstOffset.z                    = 0;
 	copyInfo.extent                         = image->extent;
-	vkCmdCopyImage(commandBuffer, image->path, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageBuffer->imageArray[imageBuffer->imageCount - 1].path, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
+	vkCmdCopyImage(commandBuffer, image->path, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, newImage.path, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
 
-	kdo_cmdImageBarrier(commandBuffer, imageBuffer->imageArray[imageBuffer->imageCount - 1].path, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image->layout);
+	kdo_cmdImageBarrier(commandBuffer, newImage.path, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image->layout);
 	kdo_cmdImageBarrier(commandBuffer, image->path, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image->layout);
 
 	kdo_endUniqueCommand(&commandBuffer, device, commandPool, queue);

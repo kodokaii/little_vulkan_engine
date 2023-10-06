@@ -16,10 +16,10 @@ layout(std430, binding = 0) readonly buffer ObjectBuffer
     Object	objectArray[];
 } objectBuffer;
 
-layout(std430, binding = 1) readonly buffer Vector3Buffer
+layout(std430, binding = 1) readonly buffer Vector4Buffer
 {
-	vec3	vec3Array[];	
-} vector3Buffer;
+	vec4	vec4Array[];	
+} vector4Buffer;
 
 layout(std430, binding = 2) readonly buffer Vector2Buffer
 {
@@ -51,10 +51,10 @@ void main()
 { 
 	mat4	inModelMat	= objectBuffer.objectArray[gl_InstanceIndex].modelMat;
 	mat4	inNormalMat	= objectBuffer.objectArray[gl_InstanceIndex].normalMat;
-	vec3	inPos		= vector3Buffer.vec3Array[inPosIndex];
-	vec3	inTangent	= vector3Buffer.vec3Array[inTangentIndex];
-	vec3	inBitangent	= vector3Buffer.vec3Array[inBitangentIndex];
-	vec3	inNormal	= vector3Buffer.vec3Array[inNormalIndex];
+	vec3	inPos		= vec3(vector4Buffer.vec4Array[inPosIndex]);
+	vec3	inTangent	= vec3(vector4Buffer.vec4Array[inTangentIndex]);
+	vec3	inBitangent	= vec3(vector4Buffer.vec4Array[inBitangentIndex]);
+	vec3	inNormal	= vec3(vector4Buffer.vec4Array[inNormalIndex]);
 	vec2	inUV		= vector2Buffer.vec2Array[inUVIndex];
 	
     gl_Position			= push.camera * inModelMat * vec4(inPos, 1);

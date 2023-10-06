@@ -66,20 +66,28 @@ void main() {
 
 	Material mtl			= materialBuffer.materialArray[inMtlIndex];
 
+
 	vec3	ambientLight	= vec3(0.01, 0.01, 0.01);
 	vec3	lightPos		= vec3(lightBuffer.lightArray[0].pos_intensity);
 	vec3	lightColor		= vec3(lightBuffer.lightArray[0].color_stop);
-
-	vec3	lightDir		= normalize(lightPos - inPos);
-	vec3	viewDir			= normalize(vec3(push.cameraPos) - inPos);
-	vec3	reflectDir		= reflect(-lightDir, inNormal);
-
+	
 	vec3	diffuseMap		= vec3(texture(sampler2D(tex[mtl.diffuseMap], defaultSampler), inUV));
 	vec3	specularMap		= mtl.specularMap != 0	? vec3(texture(sampler2D(tex[mtl.specularMap], defaultSampler), inUV))	: vec3(1, 1, 1);
 	vec3	bumpMap			= mtl.bumpMap != 0		? vec3(texture(sampler2D(tex[mtl.bumpMap], defaultSampler), inUV))		: vec3(0, 0, 1);
 
+	vec3	tangent			= normalize(inTangent);
+	vec3	bitangent		= normalize(inBitangent);
+	vec3	normal			= normalize(inNormal);
+
+	mat3	TBN				= mat3(tangent, bitangent, normal);
+			normal			= normalize(TBN * bumpMap);
+
+	vec3	lightDir		= normalize(lightPos - inPos);
+	vec3	viewDir			= normalize(vec3(push.cameraPos) - inPos);
+	vec3	reflectDir		= reflect(-lightDir, normal);
+
 	vec3	ambient			= mtl.ambient * ambientLight;
-	vec3	diffuse			= mtl.diffuse * diffuseMap * lightColor * max(dot(inNormal, lightDir), 0.0);
+	vec3	diffuse			= mtl.diffuse * diffuseMap * lightColor * max(dot(normal, lightDir), 0.0);
 	vec3	specular		= mtl.specular * specularMap * lightColor * pow(max(dot(viewDir, reflectDir), 0.0), mtl.shininess);
 
 	outColor = vec4(ambient + diffuse + specular, 1);

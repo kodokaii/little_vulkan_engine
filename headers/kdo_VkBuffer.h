@@ -36,7 +36,6 @@ typedef struct Kdo_VkGPUBuffer
 	VkBufferCreateInfo	info;
 	VkDeviceSize		fillSize;
 }	Kdo_VkGPUBuffer;
-
 typedef struct Kdo_VkGPUImage
 {
     VkImage			path;
